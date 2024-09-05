@@ -84,6 +84,14 @@ void computeMatricesFromInputs() {
     if (glfwGetKey(pWindow, GLFW_KEY_LEFT) == GLFW_PRESS || glfwGetKey(pWindow, GLFW_KEY_A) == GLFW_PRESS) {
         position -= right * deltaTime * speed;
     }
+    // Strafe up
+    if (glfwGetKey(pWindow, GLFW_KEY_R) == GLFW_PRESS) {
+        position += up * deltaTime * speed;
+    }
+    // Strafe down
+    if (glfwGetKey(pWindow, GLFW_KEY_F) == GLFW_PRESS) {
+        position -= up * deltaTime * speed;
+    }
 
     float FoV = initialFoV;// - 5 * glfwGetMouseWheel(); // Now GLFW 3 requires setting up a callback for this. It's a bit too complicated for this beginner's tutorial, so it's disabled instead.
 
