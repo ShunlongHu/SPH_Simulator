@@ -14,6 +14,7 @@
 #include <memory>
 
 #include "controls.hpp"
+#include "engine.h"
 #include "mesh.h"
 #include "shader.hpp"
 using namespace glm;
@@ -25,6 +26,7 @@ static unique_ptr<MeshColorPosStrip> pParticle;
 static double lastTime{0};
 static GLuint programID{0};
 static GLuint ViewProjMatrixID{0};
+static Engine2D engine2D(1000);
 
 void Render::Init() {
     // Initialize GLEW
@@ -61,6 +63,8 @@ void Render::Init() {
 }
 
 void Render::Step() {
+    for (int i = 0; i < 10; ++i) { engine2D.Step(); }
+
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     double currentTime = glfwGetTime();
@@ -78,7 +82,7 @@ void Render::Step() {
     // Use our shader
     glUseProgram(programID);
     glUniformMatrix4fv(ViewProjMatrixID, 1, GL_FALSE, &ViewProjectionMatrix[0][0]);
-
-    pParticle->Draw({0, 0, 0, 1, 0.5, 0.5, 0.5, 0.5}, {1, 1, 1, 1, 0, 1, 1, 1});
+    //    pParticle->Draw({0, 0, 0, 1, 0.5, 0.5, 0.5, 0.5}, {1, 1, 1, 1, 0, 1, 1, 1});
+    pParticle->Draw(engine2D.GetXyzs(), engine2D.GetColor());
 }
 }// namespace Sph

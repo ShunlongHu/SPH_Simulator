@@ -13,9 +13,9 @@ uniform mat4 VP; // Model-View-Projection matrix, but without the Model (the pos
 
 void main()
 {
-	float particleSize = 1; // because we encoded it this way.
+	float particleSize = xyzs.a; // because we encoded it this way.
 	vec3 particleCenter_wordspace = xyzs.xyz;
-	vec3 vertexPosition_worldspace = particleCenter_wordspace + vec3(squareVertices.x * particleSize, squareVertices.y * particleSize, 0);
+	vec3 vertexPosition_worldspace = particleCenter_wordspace + vec3(squareVertices.x * particleSize, squareVertices.y * particleSize, squareVertices.z * particleSize);
 	// Output position of the vertex
 	gl_Position = VP * vec4(vertexPosition_worldspace, 1.0f);
 	particlecolor = color;
