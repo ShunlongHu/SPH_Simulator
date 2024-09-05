@@ -57,6 +57,24 @@ void Engine2D::StepOne() {
     for (uint64_t i = 0; i < pos_.size(); ++i) {
         pos_[i].x[0] += u_[i].x[0] * DT;
         pos_[i].x[1] += u_[i].x[1] * DT;
+        if (pos_[i].x[0] < DOMAIN_X_LIM[0]) {
+            pos_[i].x[0] = DOMAIN_X_LIM[0];
+            u_[i].x[0] *= DAMPING_COEFFICIENT;
+        }
+        if (pos_[i].x[1] < DOMAIN_Y_LIM[0]) {
+            pos_[i].x[1] = DOMAIN_Y_LIM[0];
+            u_[i].x[1] *= DAMPING_COEFFICIENT;
+        }
+        if (pos_[i].x[0] > DOMAIN_X_LIM[1]) {
+            pos_[i].x[0] = DOMAIN_X_LIM[1];
+            u_[i].x[0] *= DAMPING_COEFFICIENT;
+        }
+        if (pos_[i].x[1] > DOMAIN_Y_LIM[1]) {
+            pos_[i].x[1] = DOMAIN_Y_LIM[1];
+            u_[i].x[1] *= DAMPING_COEFFICIENT;
+        }
+
+
         u_[i].x[0] += (f_[i].x[0] + G_FORCE.x[0]) / PARTICLE_MASS * DT;
         u_[i].x[1] += (f_[i].x[1] + G_FORCE.x[1]) / PARTICLE_MASS * DT;
     }
