@@ -1,9 +1,11 @@
+#include "render.h"
 #include "window.h"
 #include <iostream>
 
 using namespace Sph;
 int main() {
     Window window;
-    window.Run([]() {});
+    Render::Init();
+    window.Run([]() { Render::Step(); });
     return 0;
 }

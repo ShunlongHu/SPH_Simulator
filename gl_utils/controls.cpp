@@ -1,6 +1,6 @@
 // Include GLFW
 #include <GLFW/glfw3.h>
-extern GLFWwindow* window;// The "extern" keyword here is to access the variable "window" declared in tutorialXXX.cpp. This is a hack to keep the tutorials simple. Please avoid this.
+extern GLFWwindow* pWindow;// The "extern" keyword here is to access the variable "window" declared in tutorialXXX.cpp. This is a hack to keep the tutorials simple. Please avoid this.
 
 // Include GLM
 #include <glm/glm.hpp>
@@ -44,10 +44,10 @@ void computeMatricesFromInputs() {
 
     // Get mouse position
     double xpos, ypos;
-    glfwGetCursorPos(window, &xpos, &ypos);
+    glfwGetCursorPos(pWindow, &xpos, &ypos);
 
     // Reset mouse position for next frame
-    glfwSetCursorPos(window, 1024 / 2, 768 / 2);
+    glfwSetCursorPos(pWindow, 1024 / 2, 768 / 2);
 
     // Compute new orientation
     horizontalAngle += mouseSpeed * float(1024 / 2 - xpos);
@@ -69,19 +69,19 @@ void computeMatricesFromInputs() {
     glm::vec3 up = glm::cross(right, direction);
 
     // Move forward
-    if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS || glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
+    if (glfwGetKey(pWindow, GLFW_KEY_UP) == GLFW_PRESS || glfwGetKey(pWindow, GLFW_KEY_W) == GLFW_PRESS) {
         position += direction * deltaTime * speed;
     }
     // Move backward
-    if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS || glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) {
+    if (glfwGetKey(pWindow, GLFW_KEY_DOWN) == GLFW_PRESS || glfwGetKey(pWindow, GLFW_KEY_S) == GLFW_PRESS) {
         position -= direction * deltaTime * speed;
     }
     // Strafe right
-    if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS || glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) {
+    if (glfwGetKey(pWindow, GLFW_KEY_RIGHT) == GLFW_PRESS || glfwGetKey(pWindow, GLFW_KEY_D) == GLFW_PRESS) {
         position += right * deltaTime * speed;
     }
     // Strafe left
-    if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS || glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) {
+    if (glfwGetKey(pWindow, GLFW_KEY_LEFT) == GLFW_PRESS || glfwGetKey(pWindow, GLFW_KEY_A) == GLFW_PRESS) {
         position -= right * deltaTime * speed;
     }
 

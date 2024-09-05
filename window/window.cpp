@@ -6,8 +6,8 @@
 #include <GLFW/glfw3.h>
 #include <iostream>
 using namespace std;
+GLFWwindow* pWindow;
 namespace Sph {
-static GLFWwindow* pWindow;
 Window::Window() {
     // Initialize GLFW
     if (!glfwInit()) {
