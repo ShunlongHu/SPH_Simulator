@@ -239,32 +239,18 @@ void Engine2D::UpdateForce() {
     for_each(retVal.begin(), retVal.end(), [](future<void>& iter) { iter.wait(); });
 }
 void Engine2D::UpdateForcePerBlock(uint64_t idx, uint64_t size) {
-    //    for (uint64_t i = idx; i < min(idx + size, particlePairsSingle_.size()); ++i) {
-    //        const auto& [src, tgt] = particlePairsSingle_[i];
-    //        NORMALIZATION_PRESSURE_FORCE * (
-    //            -
-    //            (
-    //                pos_[tgt]
-    //                -
-    //                pos_[src]
-    //            ) / pairDistance_[i]
-    //            *
-    //            (
-    //                pressures[tgt]
-    //                +
-    //                pressures[src]
-    //            ) / (2 * densities[tgt])
-    //            *
-    //            (
-    //                SMOOTHING_LENGTH
-    //                -
-    //                pairDistance_[i]
-    //            )**2
-    //
-    //        auto dist = pairDistanceSingle_[i];
-    //        auto squareDiff = (SMOOTHING_LENGTH * SMOOTHING_LENGTH - dist * dist);
-    //        rho_[src] += NORMALIZATION_Force * squareDiff * squareDiff * squareDiff;
-    //    }
+    for (uint64_t i = idx; i < min(idx + size, particlePairsSingle_.size()); ++i) {
+        const auto& [src, tgt] = particlePairsSingle_[i];
+        auto distance = pairDistanceSingle_[i];
+        auto force = NORMALIZATION_PRESSURE_FORCE * (-1 / distance * (p_[tgt] + p_[src]) / (2 * rho_[tgt]) *
+                                                     (SMOOTHING_LENGTH - distance) * (SMOOTHING_LENGTH - distance));
+        f_[src].x[0] += force * (pos_[tgt].x[0] - pos_[src].x[0]);
+        f_[src].x[1] += force * (pos_[tgt].x[1] - pos_[src].x[1]);
+
+        auto viscosity = NORMALIZATION_VISCOUS_FORCE * 1 / (2 * rho_[tgt]) * (SMOOTHING_LENGTH - distance);
+        f_[src].x[0] += viscosity * (u_[tgt].x[0] - u_[src].x[0]);
+        f_[src].x[1] += viscosity * (u_[tgt].x[1] - u_[src].x[1]);
+    }
 }
 void Engine2D::VerifyPair() {
     uint64_t cnt = 0;

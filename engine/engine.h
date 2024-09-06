@@ -24,13 +24,11 @@ public:
     void Step();
     void StepOne();
     void UpdatePosVelocity();
-    void UpdatePosVelocityPerBlock(uint64_t idx, uint64_t size);
     void FindPair();
     void FindPairPerBlock(uint64_t idx, uint64_t size);
     void VerifyPair();
     void UpdateDensity();
     void UpdateDensityPerBlock(uint64_t idx, uint64_t size);
-    void ConcatResult(uint64_t idx, uint64_t size);
     void UpdatePressure();
     void UpdatePressurePerBlock(uint64_t idx, uint64_t size);
     void UpdateForce();
@@ -57,7 +55,7 @@ public:
     constexpr static uint64_t RENDER_INTERVAL = 6;
     constexpr static float PARTICLE_MASS = 1;
     constexpr static float ISOTROPIC_EXPONENT = 20;
-    constexpr static float BASE_DENSITY = 1;
+    constexpr static float BASE_DENSITY = 0.01;
     constexpr static uint64_t SMOOTHING_LENGTH = 5;
     constexpr static float DYNAMIC_VISCOSITY = 0.5;
     constexpr static float DAMPING_COEFFICIENT = -0.9;
