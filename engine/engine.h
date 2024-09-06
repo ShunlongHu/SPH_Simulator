@@ -21,6 +21,8 @@ public:
     ~Engine2D() = default;
     void Step();
     void StepOne();
+    void UpdatePosVelocity();
+    void FindPair();
     const std::vector<float>& GetXyzs();
     const std::vector<float>& GetColor();
 
@@ -32,10 +34,11 @@ public:
     std::vector<float> xyzsVec_{};
     std::vector<float> colorVec_{};
     std::vector<std::unordered_set<uint64_t>> idxBucket_{};
+    std::vector<std::pair<uint64_t, uint64_t>> particlePairs_{};
 
     float time_{0};
 
-    constexpr static float RENDER_INTERVAL = 6;
+    constexpr static uint64_t RENDER_INTERVAL = 6;
     constexpr static float PARTICLE_MASS = 1;
     constexpr static float ISOTROPIC_EXPONENT = 20;
     constexpr static float BASE_DENSITY = 1;
