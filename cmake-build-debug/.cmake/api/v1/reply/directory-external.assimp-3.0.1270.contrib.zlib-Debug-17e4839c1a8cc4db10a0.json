@@ -1,0 +1,14 @@
+{
+	"backtraceGraph" : 
+	{
+		"commands" : [],
+		"files" : [],
+		"nodes" : []
+	},
+	"installers" : [],
+	"paths" : 
+	{
+		"build" : "external/assimp-3.0.1270/contrib/zlib",
+		"source" : "external/assimp-3.0.1270/contrib/zlib"
+	}
+}

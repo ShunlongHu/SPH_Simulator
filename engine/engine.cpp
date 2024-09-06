@@ -11,7 +11,7 @@ namespace Sph {
 inline uint64_t CalcBucket(const Pos<2>& pos) {
     auto bucketX = static_cast<uint64_t>(pos.x[0] / Engine2D::SMOOTHING_LENGTH);
     auto bucketY = static_cast<uint64_t>(pos.x[1] / Engine2D::SMOOTHING_LENGTH);
-    return bucketY * Engine2D::BUCKET_NUM_X + bucketX;
+    return bucketY + Engine2D::BUCKET_NUM_Y * bucketX;
 }
 
 Engine2D::Engine2D(int particleNum) {
@@ -50,7 +50,7 @@ const std::vector<float>& Engine2D::GetXyzs() {
         xyzsVec_[i * 4 + 0] = (pos_[i].x[0] + biasX) / scaling;
         xyzsVec_[i * 4 + 1] = (pos_[i].x[1] + biasY) / scaling;
         xyzsVec_[i * 4 + 2] = i / 10000.0f;
-        xyzsVec_[i * 4 + 3] = SMOOTHING_LENGTH / scaling;
+        xyzsVec_[i * 4 + 3] = 1 / scaling;
     }
     return xyzsVec_;
 }
@@ -66,8 +66,8 @@ inline float Distance(const Pos<2>& pos1, const Pos<2>& pos2) {
 }
 void Engine2D::FindPairPerBlock(uint64_t idx, uint64_t size) {
     for (int64_t curIdx = idx; curIdx < min(particlePairs_.size(), idx + size); ++curIdx) {
-        int64_t bucketX = curIdx % BUCKET_NUM_X;
-        int64_t bucketY = curIdx / BUCKET_NUM_X;
+        int64_t bucketX = curIdx / BUCKET_NUM_Y;
+        int64_t bucketY = curIdx % BUCKET_NUM_Y;
         particlePairs_[curIdx].resize(0);
         pairDistance_[curIdx].resize(0);
         for (int64_t osY = -1; osY <= 1; ++osY) {
@@ -80,11 +80,11 @@ void Engine2D::FindPairPerBlock(uint64_t idx, uint64_t size) {
                 if (tgtX >= BUCKET_NUM_X || tgtX < 0) {
                     continue;
                 }
-                auto tgtIdx = tgtY * BUCKET_NUM_X + tgtX;
+                auto tgtIdx = tgtY + BUCKET_NUM_Y * tgtX;
                 for (const auto& cur: idxBucket_[curIdx]) {
                     for (const auto& tgt: idxBucket_[tgtIdx]) {
                         if (cur == tgt) {
-                            continue;
+                            //                            continue;
                         }
                         auto distance = Distance(pos_[cur], pos_[tgt]);
                         if (distance < SMOOTHING_LENGTH) {
@@ -180,8 +180,8 @@ void Engine2D::UpdatePosVelocity() {
                     idxBucket_[origBucket].erase(i);
                     idxBucket_[newBucket].emplace(i);
                 }
-                u_[i].x[0] += (f_[i].x[0] + G_FORCE.x[0]) / PARTICLE_MASS * DT;
-                u_[i].x[1] += (f_[i].x[1] + G_FORCE.x[1]) / PARTICLE_MASS * DT;
+                u_[i].x[0] += (min(MAX_ACC, max(-MAX_ACC, f_[i].x[0] / rho_[i])) + G_FORCE.x[0]) * DT;
+                u_[i].x[1] += (min(MAX_ACC, max(-MAX_ACC, f_[i].x[1] / rho_[i])) + G_FORCE.x[1]) * DT;
             }
         }));
     }
@@ -241,15 +241,21 @@ void Engine2D::UpdateForce() {
 void Engine2D::UpdateForcePerBlock(uint64_t idx, uint64_t size) {
     for (uint64_t i = idx; i < min(idx + size, particlePairsSingle_.size()); ++i) {
         const auto& [src, tgt] = particlePairsSingle_[i];
+        if (src == tgt) {
+            continue;
+        }
         auto distance = pairDistanceSingle_[i];
-        auto force = NORMALIZATION_PRESSURE_FORCE * (-1 / distance * (p_[tgt] + p_[src]) / (2 * rho_[tgt]) *
-                                                     (SMOOTHING_LENGTH - distance) * (SMOOTHING_LENGTH - distance));
-        f_[src].x[0] += force * (pos_[tgt].x[0] - pos_[src].x[0]);
-        f_[src].x[1] += force * (pos_[tgt].x[1] - pos_[src].x[1]);
+        auto force = NORMALIZATION_PRESSURE_FORCE * (p_[tgt] + p_[src]) / (2 * rho_[tgt]) *
+                     (SMOOTHING_LENGTH - distance) * (SMOOTHING_LENGTH - distance);
+        f_[src].x[0] += force * (pos_[tgt].x[0] - pos_[src].x[0]) / max(distance, 0.001f);
+        f_[src].x[1] += force * (pos_[tgt].x[1] - pos_[src].x[1]) / max(distance, 0.001f);
 
         auto viscosity = NORMALIZATION_VISCOUS_FORCE * 1 / (2 * rho_[tgt]) * (SMOOTHING_LENGTH - distance);
         f_[src].x[0] += viscosity * (u_[tgt].x[0] - u_[src].x[0]);
         f_[src].x[1] += viscosity * (u_[tgt].x[1] - u_[src].x[1]);
+
+        f_[src].x[0] = f_[src].x[0];
+        f_[src].x[1] = f_[src].x[1];
     }
 }
 void Engine2D::VerifyPair() {
@@ -257,7 +263,7 @@ void Engine2D::VerifyPair() {
     for (int i = 0; i < pos_.size(); ++i) {
         for (int j = 0; j < pos_.size(); ++j) {
             if (i == j) {
-                continue;
+                //                continue;
             }
             cnt += (Distance(pos_[i], pos_[j]) < SMOOTHING_LENGTH);
         }

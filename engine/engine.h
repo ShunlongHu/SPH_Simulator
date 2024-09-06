@@ -54,17 +54,18 @@ public:
 
     constexpr static uint64_t RENDER_INTERVAL = 6;
     constexpr static float PARTICLE_MASS = 1;
-    constexpr static float ISOTROPIC_EXPONENT = 20;
-    constexpr static float BASE_DENSITY = 0.01;
+    constexpr static float ISOTROPIC_EXPONENT = 10;
+    constexpr static float BASE_DENSITY = 0.025;
     constexpr static uint64_t SMOOTHING_LENGTH = 5;
-    constexpr static float DYNAMIC_VISCOSITY = 0.5;
-    constexpr static float DAMPING_COEFFICIENT = -0.9;
+    constexpr static float DYNAMIC_VISCOSITY = 0.1;
+    constexpr static float DAMPING_COEFFICIENT = -0.3;
     constexpr static Pos<2> G_FORCE = {0, -0.1};
     constexpr static float DT = 0.01;
     constexpr static uint64_t DOMAIN_WIDTH = 240;
     constexpr static uint64_t DOMAIN_HEIGHT = 160;
     constexpr static uint64_t BUCKET_NUM_X = DOMAIN_WIDTH / SMOOTHING_LENGTH;
     constexpr static uint64_t BUCKET_NUM_Y = DOMAIN_HEIGHT / SMOOTHING_LENGTH;
+    constexpr static float MAX_ACC = 100;
 
     constexpr static float DOMAIN_X_LIM[2] = {
             SMOOTHING_LENGTH,
@@ -81,9 +82,7 @@ public:
     constexpr static float NORMALIZATION_PRESSURE_FORCE =
             -(45 * PARTICLE_MASS) / (M_PI * SMOOTHING_LENGTH * SMOOTHING_LENGTH * SMOOTHING_LENGTH * SMOOTHING_LENGTH *
                                      SMOOTHING_LENGTH * SMOOTHING_LENGTH);
-    constexpr static float NORMALIZATION_VISCOUS_FORCE =
-            (45 * DYNAMIC_VISCOSITY * PARTICLE_MASS) / (M_PI * SMOOTHING_LENGTH * SMOOTHING_LENGTH * SMOOTHING_LENGTH *
-                                                        SMOOTHING_LENGTH * SMOOTHING_LENGTH * SMOOTHING_LENGTH);
+    constexpr static float NORMALIZATION_VISCOUS_FORCE = -NORMALIZATION_PRESSURE_FORCE * DYNAMIC_VISCOSITY;
 };
 
 }// namespace Sph
