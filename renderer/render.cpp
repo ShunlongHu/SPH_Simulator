@@ -63,12 +63,15 @@ void Render::Init() {
 }
 
 void Render::Step() {
-    for (int i = 0; i < 10; ++i) { engine2D.Step(); }
+    for (int i = 0; i < 10; ++i) {
+        engine2D.Step();
+    }
 
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     double currentTime = glfwGetTime();
     double delta = currentTime - lastTime;
+    cout << delta << "s" << endl;
     lastTime = currentTime;
 
     computeMatricesFromInputs();

@@ -3,7 +3,9 @@
 //
 
 #include "window.h"
+
 #include <GLFW/glfw3.h>
+
 #include <iostream>
 using namespace std;
 GLFWwindow* pWindow;
@@ -25,7 +27,9 @@ Window::Window() {
     // Open a pWindow and create its OpenGL context
     pWindow = glfwCreateWindow(1024, 768, "Tutorial 18 - Particles", NULL, NULL);
     if (pWindow == nullptr) {
-        cerr << "Failed to open GLFW pWindow. If you have an Intel GPU, they are not 3.3 compatible. Try the 2.1 version of the tutorials." << endl;
+        cerr << "Failed to open GLFW pWindow. If you have an Intel GPU, they are not 3.3 compatible. Try the 2.1 "
+                "version of the tutorials."
+             << endl;
         glfwTerminate();
         exit(-1);
     }
@@ -41,9 +45,7 @@ Window::Window() {
     glfwSetCursorPos(pWindow, 1024 / 2, 768 / 2);
 }
 
-Window::~Window() {
-    glfwTerminate();
-}
+Window::~Window() { glfwTerminate(); }
 void Window::Run(const std::function<void(void)>& func) {
     do {
         func();
@@ -51,7 +53,7 @@ void Window::Run(const std::function<void(void)>& func) {
         glfwSwapBuffers(pWindow);
         glfwPollEvents();
     }// Check if the ESC key was pressed or the window was closed
-    while (glfwGetKey(pWindow, GLFW_KEY_ESCAPE) != GLFW_PRESS &&
+    while (glfwGetKey(pWindow, GLFW_KEY_ESCAPE) != GLFW_PRESS && glfwGetKey(pWindow, GLFW_KEY_P) != GLFW_PRESS &&
            glfwWindowShouldClose(pWindow) == 0);
 }
 }// namespace Sph

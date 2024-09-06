@@ -10,6 +10,8 @@
 #include <unordered_set>
 #include <vector>
 
+#include "thread_pool.h"
+
 namespace Sph {
 template<int Dim>
 struct Pos {
@@ -22,7 +24,17 @@ public:
     void Step();
     void StepOne();
     void UpdatePosVelocity();
+    void UpdatePosVelocityPerBlock(uint64_t idx, uint64_t size);
     void FindPair();
+    void FindPairPerBlock(uint64_t idx, uint64_t size);
+    void VerifyPair();
+    void UpdateDensity();
+    void UpdateDensityPerBlock(uint64_t idx, uint64_t size);
+    void ConcatResult(uint64_t idx, uint64_t size);
+    void UpdatePressure();
+    void UpdatePressurePerBlock(uint64_t idx, uint64_t size);
+    void UpdateForce();
+    void UpdateForcePerBlock(uint64_t idx, uint64_t size);
     const std::vector<float>& GetXyzs();
     const std::vector<float>& GetColor();
 
@@ -34,7 +46,11 @@ public:
     std::vector<float> xyzsVec_{};
     std::vector<float> colorVec_{};
     std::vector<std::unordered_set<uint64_t>> idxBucket_{};
-    std::vector<std::pair<uint64_t, uint64_t>> particlePairs_{};
+    std::vector<std::vector<std::pair<uint64_t, uint64_t>>> particlePairs_{};
+    std::vector<std::pair<uint64_t, uint64_t>> particlePairsSingle_{};
+    std::vector<std::vector<float>> pairDistance_{};
+    std::vector<float> pairDistanceSingle_{};
+    ThreadPool pool_{std::thread::hardware_concurrency()};
 
     float time_{0};
 
