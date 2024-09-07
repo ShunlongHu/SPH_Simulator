@@ -54,7 +54,7 @@ public:
 
     constexpr static uint64_t RENDER_INTERVAL = 6;
     constexpr static float PARTICLE_MASS = 1;
-    constexpr static float ISOTROPIC_EXPONENT = 10;
+    constexpr static float ISOTROPIC_EXPONENT = 30;
     constexpr static float BASE_DENSITY = 0.025;
     constexpr static uint64_t SMOOTHING_LENGTH = 5;
     constexpr static float DYNAMIC_VISCOSITY = 0.1;
