@@ -43,6 +43,7 @@ public:
     std::vector<float> rho_{};
     std::vector<float> xyzsVec_{};
     std::vector<float> colorVec_{};
+    std::vector<uint64_t> occupiedBucket_{};
     std::vector<std::unordered_set<uint64_t>> idxBucket_{};
     std::vector<std::vector<std::pair<uint64_t, uint64_t>>> particlePairs_{};
     std::vector<std::pair<uint64_t, uint64_t>> particlePairsSingle_{};

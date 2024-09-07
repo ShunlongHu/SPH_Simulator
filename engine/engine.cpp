@@ -65,7 +65,8 @@ inline float Distance(const Pos<2>& pos1, const Pos<2>& pos2) {
     return sqrt((pos1.x[0] - pos2.x[0]) * (pos1.x[0] - pos2.x[0]) + (pos1.x[1] - pos2.x[1]) * (pos1.x[1] - pos2.x[1]));
 }
 void Engine2D::FindPairPerBlock(uint64_t idx, uint64_t size) {
-    for (int64_t curIdx = idx; curIdx < min(particlePairs_.size(), idx + size); ++curIdx) {
+    for (uint64_t occIdx = idx; occIdx < min(occupiedBucket_.size(), idx + size); ++occIdx) {
+        auto curIdx = static_cast<int64_t>(occupiedBucket_[occIdx]);
         int64_t bucketX = curIdx / BUCKET_NUM_Y;
         int64_t bucketY = curIdx % BUCKET_NUM_Y;
         particlePairs_[curIdx].resize(0);
@@ -100,19 +101,25 @@ void Engine2D::FindPairPerBlock(uint64_t idx, uint64_t size) {
 void Engine2D::FindPair() {
     particlePairs_.resize(BUCKET_NUM_Y * BUCKET_NUM_X);
     pairDistance_.resize(BUCKET_NUM_Y * BUCKET_NUM_X);
+    occupiedBucket_.resize(0);
+    for (uint64_t i = 0; i < idxBucket_.size(); ++i) {
+        if (!idxBucket_[i].empty()) {
+            occupiedBucket_.emplace_back(i);
+        }
+    }
     auto blockNum = std::thread::hardware_concurrency() / 4 * 3;
-    auto blockSize = particlePairs_.size() / blockNum + static_cast<uint64_t>(particlePairs_.size() % blockNum > 0);
+    auto blockSize = occupiedBucket_.size() / blockNum + static_cast<uint64_t>(occupiedBucket_.size() % blockNum > 0);
 
     vector<future<void>> retVal;
-    for (uint64_t i = 0; i < particlePairs_.size(); i += blockSize) {
+    for (uint64_t i = 0; i < occupiedBucket_.size(); i += blockSize) {
         retVal.emplace_back(pool_.enqueue([this, i, blockSize] { this->FindPairPerBlock(i, blockSize); }));
     }
     for_each(retVal.begin(), retVal.end(), [](future<void>& iter) { iter.wait(); });
 
     // concat result
     uint64_t cnt = 0;
-    for (const auto& iter: particlePairs_) {
-        cnt += iter.size();
+    for (const auto& iter: occupiedBucket_) {
+        cnt += particlePairs_[iter].size();
     }
     retVal.resize(0);
     particlePairsSingle_.resize(0);
@@ -120,10 +127,11 @@ void Engine2D::FindPair() {
     particlePairsSingle_.resize(cnt, {-1, -1});
     pairDistanceSingle_.resize(cnt, -1);
     cnt = 0;
-    for (uint64_t i = 0; i < particlePairs_.size(); i += blockSize) {
+    for (uint64_t i = 0; i < occupiedBucket_.size(); i += blockSize) {
         retVal.emplace_back(pool_.enqueue([this, i, blockSize, cnt]() {
             uint64_t localCnt = cnt;
-            for (uint64_t idx = i; idx < min(this->particlePairs_.size(), i + blockSize); ++idx) {
+            for (uint64_t bucketIdx = i; bucketIdx < min(this->occupiedBucket_.size(), i + blockSize); ++bucketIdx) {
+                auto idx = occupiedBucket_[bucketIdx];
                 for (uint64_t j = 0; j < this->particlePairs_[idx].size(); ++j) {
                     this->particlePairsSingle_[localCnt] = this->particlePairs_[idx][j];
                     this->pairDistanceSingle_[localCnt] = this->pairDistance_[idx][j];
@@ -131,8 +139,8 @@ void Engine2D::FindPair() {
                 }
             }
         }));
-        for (uint64_t j = i; j < min(this->particlePairs_.size(), i + blockSize); ++j) {
-            cnt += particlePairs_[j].size();
+        for (uint64_t j = i; j < min(this->occupiedBucket_.size(), i + blockSize); ++j) {
+            cnt += particlePairs_[occupiedBucket_[j]].size();
         }
     }
     for_each(retVal.begin(), retVal.end(), [](future<void>& iter) { iter.wait(); });

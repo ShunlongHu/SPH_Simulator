@@ -25,7 +25,7 @@ Window::Window() {
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
     // Open a pWindow and create its OpenGL context
-    pWindow = glfwCreateWindow(1024, 768, "Tutorial 18 - Particles", NULL, NULL);
+    pWindow = glfwCreateWindow(1920, 1080, "Smooth Particle Hydro-dynamics Simulator", NULL, NULL);
     if (pWindow == nullptr) {
         cerr << "Failed to open GLFW pWindow. If you have an Intel GPU, they are not 3.3 compatible. Try the 2.1 "
                 "version of the tutorials."
