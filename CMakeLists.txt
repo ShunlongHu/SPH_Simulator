@@ -3,6 +3,7 @@ cmake_minimum_required(VERSION 3.10)
 project(Tutorials)
 
 include(cmake/find_opengl.cmake)
+include(cmake/find_opencl.cmake)
 
 include_directories(window)
 include_directories(gl_utils)
