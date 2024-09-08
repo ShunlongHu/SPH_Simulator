@@ -14,7 +14,7 @@
 #include <memory>
 
 #include "controls.hpp"
-#include "engine.h"
+#include "engine_hash.h"
 #include "mesh.h"
 #include "shader.hpp"
 using namespace glm;
@@ -26,7 +26,7 @@ static unique_ptr<MeshColorPosStrip> pParticle;
 static double lastTime{0};
 static GLuint programID{0};
 static GLuint ViewProjMatrixID{0};
-static Engine2D engine2D(1000);
+static EngineHash2D engine2D(1500);
 
 void Render::Init() {
     // Initialize GLEW
