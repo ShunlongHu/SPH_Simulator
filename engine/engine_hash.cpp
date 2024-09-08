@@ -82,58 +82,76 @@ inline float Distance(const Pos<2>& pos1, const Pos<2>& pos2) {
     return sqrt((pos1.x[0] - pos2.x[0]) * (pos1.x[0] - pos2.x[0]) + (pos1.x[1] - pos2.x[1]) * (pos1.x[1] - pos2.x[1]));
 }
 
-struct BitonicParam {
-    uint32_t groupWidth;
-    uint32_t groupHeight;
-    uint32_t stepIndex;
-    uint32_t numEntries;
-};
+inline void BitonicMergeSortKernel(vector<uint32_t>& value, vector<uint32_t>& idx, uint32_t i,
+                                   uint32_t compareBlockSize, uint32_t compareBlockSizePow,
+                                   uint32_t dirChangePerIdxPow) {
+    auto blockIdx = i >> (compareBlockSizePow - 1);
+    bool dir = (i >> dirChangePerIdxPow) & 1;
+    auto changeIdx = i & ((compareBlockSize >> 1) - 1);
+    auto lessIdx = dir == 0 ? (blockIdx << compareBlockSizePow) + changeIdx
+                            : (((blockIdx + 1) << compareBlockSizePow) - 1) - changeIdx;
+    auto greaterIdx = dir == 0 ? lessIdx + (compareBlockSize >> 1) : lessIdx - (compareBlockSize >> 1);
+    if (value[lessIdx] > value[greaterIdx]) {
+        auto tVal = value[lessIdx];
+        value[lessIdx] = value[greaterIdx];
+        value[greaterIdx] = tVal;
+        auto tIdx = idx[lessIdx];
+        idx[lessIdx] = idx[greaterIdx];
+        idx[greaterIdx] = tIdx;
+    }
+    //    if (dir == 0) {
+    //        cout << lessIdx << " -> " << greaterIdx << " ; ";
+    //    } else {
+    //        cout << greaterIdx << " <- " << lessIdx << " ; ";
+    //    }
+}
 
-inline void BitonicMergeSortKernel(vector<uint32_t>& value, vector<uint32_t>& idx, uint32_t i, const BitonicParam& p) {
-    uint32_t hIndex = i & (p.groupWidth - 1);
-    uint32_t indexLeft = hIndex + (p.groupHeight + 1) * (i / p.groupWidth);
-    uint32_t rightStepSize = p.stepIndex == 0 ? p.groupHeight - 2 * hIndex : (p.groupHeight + 1) / 2;
-    uint32_t indexRight = indexLeft + rightStepSize;
-
-    // Exit if out of bounds (for non-power of 2 input sizes)
-    if (indexRight >= p.numEntries) return;
-
-    uint32_t valueLeft = value[indexLeft];
-    uint32_t valueRight = value[indexRight];
-
-    // Swap entries if value is descending
-    if (valueLeft > valueRight) {
-        auto tVal = value[indexLeft];
-        value[indexLeft] = value[indexRight];
-        value[indexRight] = tVal;
-        auto tIdx = idx[indexLeft];
-        idx[indexLeft] = idx[indexRight];
-        idx[indexRight] = tIdx;
+void BitonicMergeSortBlock(vector<uint32_t>& value, vector<uint32_t>& idx, uint32_t start, uint32_t size,
+                           uint32_t compareBlockSize, uint32_t compareBlockSizePow, uint32_t dirChangePerIdxPow) {
+    auto stop = min<uint32_t>(value.size() / 2, start + size);
+    for (uint32_t i = start; i < stop; ++i) {
+        BitonicMergeSortKernel(value, idx, i, compareBlockSize, compareBlockSizePow, dirChangePerIdxPow);
     }
 }
 
-void BitonicMergeSortBlock(vector<uint32_t>& value, vector<uint32_t>& idx, uint32_t start, uint32_t size) {
-    for (uint32_t i = start; i < min<uint32_t>(value.size(), start); ++i) {
-        BitoniceMergeSortKernel(value, idx, i);
-    }
-}
-
-inline void BitonicMergeSort(vector<uint32_t>& value, vector<uint32_t>& idx) {
+inline void BitonicMergeSort(vector<uint32_t>& value, vector<uint32_t>& idx, ThreadPool& pool) {
     auto blockNum = std::thread::hardware_concurrency();
     auto blockSize = value.size() / blockNum + static_cast<uint64_t>(value.size() % blockNum > 0);
-    BitonicParam p{};
     vector<future<void>> retVal;
-    p.numEntries = value.size();
-    auto numStages = Log(NextPowerOfTwo(indexBuffer.count), 2);
-
-    for (uint32_t i = 0; i < value.size(); i += blockSize) {
-        BitonicMergeSortBlock(value, idx, i, blockSize);
+    retVal.reserve(blockNum);
+    uint32_t nextPowOfTwo;
+    uint32_t stage = 1;
+    for (nextPowOfTwo = 2; nextPowOfTwo < value.size(); nextPowOfTwo *= 2) {
+        stage++;
+    }
+    auto origSize = value.size();
+    value.resize(nextPowOfTwo, UINT32_MAX);
+    idx.resize(nextPowOfTwo);
+    uint32_t dirChangePerIdxPow = 0;
+    for (uint32_t i = 1; i < stage + 1; ++i) {
+        uint32_t compareBlockSize = 1 << i;
+        uint32_t compareBlockSizePow = i;
+        for (uint32_t j = 0; j < i; ++j) {
+            retVal.resize(0);
+            for (uint32_t start = 0; start < value.size() / 2; start += blockSize) {
+                //                retVal.emplace_back(pool.enqueue(BitonicMergeSortBlock, std::ref(value), std::ref(idx), start,
+                //                                                 blockSize, compareBlockSize, compareBlockSizePow, dirChangePerIdxPow));
+                BitonicMergeSortBlock(std::ref(value), std::ref(idx), start, blockSize, compareBlockSize,
+                                      compareBlockSizePow, dirChangePerIdxPow);
+            }
+            //            cout << endl;
+            compareBlockSize /= 2;
+            compareBlockSizePow -= 1;
+            for (auto& iter: retVal) {
+                iter.wait();
+            }
+        }
+        dirChangePerIdxPow++;
     }
 
 
-    for (uint32_t step = 2; step < value.size() * 2; step *= 2) {
-        BitonicMergeSortBlock(value, idx, cacheValue, cacheIdx, step);
-    }
+    value.resize(origSize);
+    idx.resize(origSize);
 }
 inline void VerifySort(const vector<uint32_t>& value, const vector<uint32_t>& idx, const vector<uint32_t>& origValue) {
     for (uint32_t i = 1; i < value.size(); ++i) {
@@ -168,7 +186,7 @@ void EngineHash2D::UpdateBucket() {
         }
     }
 
-    BitonicMergeSort(bucket_, bucketIdxIdxMap_);
+    BitonicMergeSort(bucket_, bucketIdxIdxMap_, pool_);
     if (VERIFY_SORT) {
         VerifySort(bucket_, bucketIdxIdxMap_, unsortedBucket_);
     }
