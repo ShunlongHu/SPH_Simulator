@@ -175,27 +175,56 @@ void CalcStartIdx(const vector<uint32_t>& bucket, vector<uint32_t>& startIdx, ui
 }
 
 void EngineHash2D::UpdateBucket() {
-    for (int i = 0; i < pos_.size(); ++i) {
-        auto key = CalcBucketHash(pos_[i]);
-        auto hash = key % pos_.size();
-        bucketIdxIdxMap_[i] = i;
-        bucket_[i] = hash;
-        bucketKeyStartIdxMap_[i] = INT32_MAX;
-#ifdef VERIFY_SORT
-        unsortedBucket_[i] = hash;
-#endif
-    }
-
+    UpdateHash();
     BitonicMergeSort(bucket_, bucketIdxIdxMap_, pool_);
 #ifdef VERIFY_SORT
     VerifySort(bucket_, bucketIdxIdxMap_, unsortedBucket_);
 #endif
+    UpdateStartIdx();
+}
 
-    uint32_t lastVal = INT32_MAX;
-    for (int i = 0; i < bucket_.size(); ++i) {
-        CalcStartIdx(bucket_, bucketKeyStartIdxMap_, i);
+void EngineHash2D::UpdateHash() {
+    auto blockNum = std::thread::hardware_concurrency();
+    auto blockSize = pos_.size() / blockNum + static_cast<uint64_t>(pos_.size() % blockNum > 0);
+    vector<future<void>> retVal;
+
+    for (uint64_t i = 0; i < pos_.size(); i += blockSize) {
+        retVal.emplace_back(pool_.enqueue([this, i, blockSize] { this->UpdateHashPerBlock(i, blockSize); }));
+    }
+    for_each(retVal.begin(), retVal.end(), [](future<void>& iter) { iter.wait(); });
+}
+void EngineHash2D::UpdateHashPerBlock(uint64_t idx, uint64_t size) {
+    for (uint64_t i = idx; i < min(idx + size, pos_.size()); ++i) {
+        UpdateHashKernel(i);
     }
 }
+void EngineHash2D::UpdateHashKernel(uint64_t idx) {
+    auto key = CalcBucketHash(pos_[idx]);
+    auto hash = key % pos_.size();
+    bucketIdxIdxMap_[idx] = idx;
+    bucket_[idx] = hash;
+    bucketKeyStartIdxMap_[idx] = INT32_MAX;
+#ifdef VERIFY_SORT
+    unsortedBucket_[i] = hash;
+#endif
+}
+
+void EngineHash2D::UpdateStartIdx() {
+    auto blockNum = std::thread::hardware_concurrency();
+    auto blockSize = pos_.size() / blockNum + static_cast<uint64_t>(pos_.size() % blockNum > 0);
+    vector<future<void>> retVal;
+
+    for (uint64_t i = 0; i < pos_.size(); i += blockSize) {
+        retVal.emplace_back(pool_.enqueue([this, i, blockSize] { this->UpdateStartIdxPerBlock(i, blockSize); }));
+    }
+    for_each(retVal.begin(), retVal.end(), [](future<void>& iter) { iter.wait(); });
+}
+void EngineHash2D::UpdateStartIdxPerBlock(uint64_t idx, uint64_t size) {
+    for (uint64_t i = idx; i < min(idx + size, pos_.size()); ++i) {
+        UpdateStartIdxKernel(i);
+    }
+}
+void EngineHash2D::UpdateStartIdxKernel(uint64_t idx) { CalcStartIdx(bucket_, bucketKeyStartIdxMap_, idx); }
 
 void EngineHash2D::StepOne() {
     UpdateBucket();

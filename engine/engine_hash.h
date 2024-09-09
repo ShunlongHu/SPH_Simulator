@@ -28,12 +28,18 @@ public:
     ~EngineHash2D() = default;
     void Step();
     void StepOne();
+    void UpdateHash();
+    void UpdateStartIdx();
     void UpdateBucket();
     void UpdatePosVelocity();
     void UpdateDensity();
     void UpdatePressure();
     void UpdateForce();
 
+    void UpdateHashPerBlock(uint64_t idx, uint64_t size);
+    void UpdateHashKernel(uint64_t idx);
+    void UpdateStartIdxPerBlock(uint64_t idx, uint64_t size);
+    void UpdateStartIdxKernel(uint64_t idx);
     void UpdateDensityPerBlock(uint64_t idx, uint64_t size);
     void UpdateDensityKernel(uint64_t idx);
     void UpdatePressurePerBlock(uint64_t idx, uint64_t size);

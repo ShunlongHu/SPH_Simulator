@@ -4,8 +4,7 @@
 
 #ifndef TUTORIALS_ENGINE_HASH_CL_H
 #define TUTORIALS_ENGINE_HASH_CL_H
-#include <CL/cl.h>
-
+#include <CL/cl2.hpp>
 #include <cmath>
 #include <cstdint>
 #include <unordered_map>
@@ -29,11 +28,17 @@ public:
     void Step();
     void StepOne();
     void UpdateBucket();
+    void UpdateHash();
+    void UpdateStartIdx();
     void UpdatePosVelocity();
     void UpdateDensity();
     void UpdatePressure();
     void UpdateForce();
 
+    void UpdateHashPerBlock(uint64_t idx, uint64_t size);
+    void UpdateHashKernel(uint64_t idx);
+    void UpdateStartIdxPerBlock(uint64_t idx, uint64_t size);
+    void UpdateStartIdxKernel(uint64_t idx);
     void UpdateDensityPerBlock(uint64_t idx, uint64_t size);
     void UpdateDensityKernel(uint64_t idx);
     void UpdatePressurePerBlock(uint64_t idx, uint64_t size);
@@ -93,6 +98,9 @@ public:
             -(45 * PARTICLE_MASS) / (M_PI * SMOOTHING_LENGTH * SMOOTHING_LENGTH * SMOOTHING_LENGTH * SMOOTHING_LENGTH *
                                      SMOOTHING_LENGTH * SMOOTHING_LENGTH);
     constexpr static float NORMALIZATION_VISCOUS_FORCE = -NORMALIZATION_PRESSURE_FORCE * DYNAMIC_VISCOSITY;
+
+    cl::Context ctx;
+    cl::Program program;
 };
 
 }// namespace Sph
