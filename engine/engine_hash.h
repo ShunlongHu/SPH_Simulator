@@ -15,10 +15,13 @@
 #include "thread_pool.h"
 
 namespace Sph {
+#ifndef POS_HEADER
+#define POS_HEADER
 template<int Dim>
 struct Pos {
     float x[Dim]{};
 };
+#endif
 class EngineHash2D {
 public:
     explicit EngineHash2D(int particleNum);
@@ -33,6 +36,12 @@ public:
 
     void UpdateDensityPerBlock(uint64_t idx, uint64_t size);
     void UpdateDensityKernel(uint64_t idx);
+    void UpdatePressurePerBlock(uint64_t idx, uint64_t size);
+    void UpdatePressureKernel(uint64_t idx);
+    void UpdateForcePerBlock(uint64_t idx, uint64_t size);
+    void UpdateForceKernel(uint64_t idx);
+    void UpdatePosVelocityPerBlock(uint64_t idx, uint64_t size);
+    void UpdatePosVelocityKernel(uint64_t idx);
 
     // opencl
     const std::vector<float>& GetXyzs();

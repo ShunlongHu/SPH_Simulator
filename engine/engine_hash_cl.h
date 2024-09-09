@@ -2,8 +2,8 @@
 // Created by QIAQIA on 2024/9/5.
 //
 
-#ifndef TUTORIALS_ENGINE_H
-#define TUTORIALS_ENGINE_H
+#ifndef TUTORIALS_ENGINE_HASH_CL_H
+#define TUTORIALS_ENGINE_HASH_CL_H
 #include <CL/cl.h>
 
 #include <cmath>
@@ -22,68 +22,31 @@ struct Pos {
     float x[Dim]{};
 };
 #endif
-
-struct ClObj {
-    ClObj() = default;
-    ~ClObj() {
-        clFlush(commandQueue);
-        clFinish(commandQueue);
-        clReleaseKernel(kernel);
-        clReleaseProgram(program);
-
-        clReleaseMemObject(aBuff);
-        clReleaseMemObject(bBuff);
-        clReleaseMemObject(cBuff);
-
-        clReleaseCommandQueue(commandQueue);
-        clReleaseContext(context);
-    }
-
-    cl_platform_id platformId = nullptr;
-    cl_uint retNumPlatforms;
-    cl_device_id deviceId = nullptr;
-    cl_uint retNumDevices;
-    cl_context context = nullptr;
-    cl_kernel kernel = nullptr;
-    cl_program program = nullptr;
-    cl_command_queue commandQueue = nullptr;
-
-
-    cl_kernel findBucketKernel = nullptr;
-    cl_kernel findPairKernel = nullptr;
-    cl_kernel concatPairKernel = nullptr;
-    cl_kernel updateVelocity = nullptr;
-    cl_kernel updateBucket = nullptr;
-    cl_kernel updateDensity = nullptr;
-    cl_kernel updatePressure = nullptr;
-    cl_kernel updateForce = nullptr;
-
-    cl_mem aBuff, bBuff, cBuff;
-};
-class Engine2D {
+class EngineHashCL2D {
 public:
-    explicit Engine2D(int particleNum);
-    ~Engine2D() = default;
+    explicit EngineHashCL2D(int particleNum);
+    ~EngineHashCL2D() = default;
     void Step();
     void StepOne();
+    void UpdateBucket();
     void UpdatePosVelocity();
-    void FindPair();
-    void FindPairPerBlock(uint64_t idx, uint64_t size);
-    void VerifyPair();
     void UpdateDensity();
-    void UpdateDensityPerBlock(uint64_t idx, uint64_t size);
     void UpdatePressure();
-    void UpdatePressurePerBlock(uint64_t idx, uint64_t size);
     void UpdateForce();
+
+    void UpdateDensityPerBlock(uint64_t idx, uint64_t size);
+    void UpdateDensityKernel(uint64_t idx);
+    void UpdatePressurePerBlock(uint64_t idx, uint64_t size);
+    void UpdatePressureKernel(uint64_t idx);
     void UpdateForcePerBlock(uint64_t idx, uint64_t size);
+    void UpdateForceKernel(uint64_t idx);
+    void UpdatePosVelocityPerBlock(uint64_t idx, uint64_t size);
+    void UpdatePosVelocityKernel(uint64_t idx);
 
     // opencl
-    void InitCl();
     const std::vector<float>& GetXyzs();
     const std::vector<float>& GetColor();
 
-
-    ClObj obj_;
     std::vector<Pos<2>> pos_{};
     std::vector<Pos<2>> u_{};
     std::vector<Pos<2>> f_{};
@@ -91,16 +54,16 @@ public:
     std::vector<float> rho_{};
     std::vector<float> xyzsVec_{};
     std::vector<float> colorVec_{};
-    std::vector<uint64_t> occupiedBucket_{};
-    std::vector<std::unordered_set<uint64_t>> idxBucket_{};
-    std::vector<std::vector<std::pair<uint64_t, uint64_t>>> particlePairs_{};
-    std::vector<std::pair<uint64_t, uint64_t>> particlePairsSingle_{};
-    std::vector<std::vector<float>> pairDistance_{};
-    std::vector<float> pairDistanceSingle_{};
+
+    std::vector<uint32_t> unsortedBucket_{};
+    std::vector<uint32_t> bucket_{};
+    std::vector<uint32_t> bucketIdxIdxMap_{};
+    std::vector<uint32_t> bucketKeyStartIdxMap_{};
+
+    std::vector<uint32_t> distance_{};
     ThreadPool pool_{std::thread::hardware_concurrency()};
 
     float time_{0};
-
     constexpr static uint64_t RENDER_INTERVAL = 6;
     constexpr static float PARTICLE_MASS = 1;
     constexpr static float ISOTROPIC_EXPONENT = 200;
@@ -112,8 +75,6 @@ public:
     constexpr static float DT = 0.01;
     constexpr static uint64_t DOMAIN_WIDTH = 240;
     constexpr static uint64_t DOMAIN_HEIGHT = 160;
-    constexpr static uint64_t BUCKET_NUM_X = DOMAIN_WIDTH / SMOOTHING_LENGTH + (DOMAIN_WIDTH % SMOOTHING_LENGTH > 0);
-    constexpr static uint64_t BUCKET_NUM_Y = DOMAIN_HEIGHT / SMOOTHING_LENGTH + (DOMAIN_HEIGHT % SMOOTHING_LENGTH > 0);
     constexpr static float MAX_ACC = 100;
 
     constexpr static float DOMAIN_X_LIM[2] = {
@@ -136,4 +97,4 @@ public:
 
 }// namespace Sph
 
-#endif//TUTORIALS_ENGINE_H
+#endif//TUTORIALS_ENGINE_HASH_CL_H

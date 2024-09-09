@@ -2,7 +2,7 @@
 // Created by QIAQIA on 2024/9/5.
 //
 
-#include "engine_hash.h"
+#include "engine_hash_cl.h"
 
 #include <algorithm>
 #include <fstream>
@@ -15,8 +15,8 @@ inline uint32_t CalcBucketHash(const Pos<2>& pos) {
     static const uint32_t hashK1 = 15823;
     static const uint32_t hashK2 = 9737333;
     static const uint32_t hashK3 = 440817757;
-    return (static_cast<uint32_t>(pos.x[0]) / static_cast<uint32_t>(EngineHash2D::SMOOTHING_LENGTH)) * hashK1 +
-           (static_cast<uint32_t>(pos.x[1]) / static_cast<uint32_t>(EngineHash2D::SMOOTHING_LENGTH)) * hashK2;
+    return (static_cast<uint32_t>(pos.x[0]) / static_cast<uint32_t>(EngineHashCL2D::SMOOTHING_LENGTH)) * hashK1 +
+           (static_cast<uint32_t>(pos.x[1]) / static_cast<uint32_t>(EngineHashCL2D::SMOOTHING_LENGTH)) * hashK2;
 }
 
 inline uint32_t CalcBucketHash(uint32_t bucketX, uint32_t bucketY) {
@@ -27,7 +27,7 @@ inline uint32_t CalcBucketHash(uint32_t bucketX, uint32_t bucketY) {
 }
 
 
-EngineHash2D::EngineHash2D(int particleNum) {
+EngineHashCL2D::EngineHashCL2D(int particleNum) {
     srand(0);
     pos_.resize(particleNum);
     u_.resize(particleNum);
@@ -49,7 +49,7 @@ EngineHash2D::EngineHash2D(int particleNum) {
     }
 }
 
-const std::vector<float>& EngineHash2D::GetColor() {
+const std::vector<float>& EngineHashCL2D::GetColor() {
     for (uint64_t i = 0; i < rho_.size(); ++i) {
         float diff = 2 - min(max(rho_[i], 0.0f), BASE_DENSITY * 2) / BASE_DENSITY;
         colorVec_[i * 4 + 0] = diff < 1 ? 1 : 2 - diff;
@@ -59,7 +59,7 @@ const std::vector<float>& EngineHash2D::GetColor() {
     }
     return colorVec_;
 }
-const std::vector<float>& EngineHash2D::GetXyzs() {
+const std::vector<float>& EngineHashCL2D::GetXyzs() {
     float scaling = max(DOMAIN_HEIGHT, DOMAIN_WIDTH) / 4.0f;
     float biasX = DOMAIN_WIDTH / -2.0f;
     float biasY = DOMAIN_HEIGHT / -2.0f;
@@ -71,7 +71,7 @@ const std::vector<float>& EngineHash2D::GetXyzs() {
     }
     return xyzsVec_;
 }
-void EngineHash2D::Step() {
+void EngineHashCL2D::Step() {
     for (int i = 0; i < RENDER_INTERVAL; ++i) {
         StepOne();
     }
@@ -174,7 +174,7 @@ void CalcStartIdx(const vector<uint32_t>& bucket, vector<uint32_t>& startIdx, ui
     }
 }
 
-void EngineHash2D::UpdateBucket() {
+void EngineHashCL2D::UpdateBucket() {
     for (int i = 0; i < pos_.size(); ++i) {
         auto key = CalcBucketHash(pos_[i]);
         auto hash = key % pos_.size();
@@ -197,7 +197,7 @@ void EngineHash2D::UpdateBucket() {
     }
 }
 
-void EngineHash2D::StepOne() {
+void EngineHashCL2D::StepOne() {
     UpdateBucket();
     UpdateDensity();
     UpdatePressure();
@@ -205,7 +205,7 @@ void EngineHash2D::StepOne() {
     UpdatePosVelocity();
     time_ += DT;
 }
-void EngineHash2D::UpdatePosVelocity() {
+void EngineHashCL2D::UpdatePosVelocity() {
     auto blockNum = std::thread::hardware_concurrency();
     auto blockSize = pos_.size() / blockNum + static_cast<uint64_t>(pos_.size() % blockNum > 0);
     vector<future<void>> retVal;
@@ -215,12 +215,12 @@ void EngineHash2D::UpdatePosVelocity() {
     }
     for_each(retVal.begin(), retVal.end(), [](future<void>& iter) { iter.wait(); });
 }
-void EngineHash2D::UpdatePosVelocityPerBlock(uint64_t idx, uint64_t size) {
+void EngineHashCL2D::UpdatePosVelocityPerBlock(uint64_t idx, uint64_t size) {
     for (uint64_t i = idx; i < min(idx + size, pos_.size()); ++i) {
         UpdatePosVelocityKernel(i);
     }
 }
-void EngineHash2D::UpdatePosVelocityKernel(uint64_t idx) {
+void EngineHashCL2D::UpdatePosVelocityKernel(uint64_t idx) {
     pos_[idx].x[0] += u_[idx].x[0] * DT;
     pos_[idx].x[1] += u_[idx].x[1] * DT;
     if (pos_[idx].x[0] < DOMAIN_X_LIM[0]) {
@@ -242,7 +242,7 @@ void EngineHash2D::UpdatePosVelocityKernel(uint64_t idx) {
     u_[idx].x[0] += (min(MAX_ACC, max(-MAX_ACC, f_[idx].x[0] / rho_[idx])) + G_FORCE.x[0]) * DT;
     u_[idx].x[1] += (min(MAX_ACC, max(-MAX_ACC, f_[idx].x[1] / rho_[idx])) + G_FORCE.x[1]) * DT;
 }
-void EngineHash2D::UpdateDensity() {
+void EngineHashCL2D::UpdateDensity() {
     auto blockNum = std::thread::hardware_concurrency();
     auto blockSize = pos_.size() / blockNum + static_cast<uint64_t>(pos_.size() % blockNum > 0);
     vector<future<void>> retVal;
@@ -252,12 +252,12 @@ void EngineHash2D::UpdateDensity() {
     }
     for_each(retVal.begin(), retVal.end(), [](future<void>& iter) { iter.wait(); });
 }
-void EngineHash2D::UpdateDensityPerBlock(uint64_t idx, uint64_t size) {
+void EngineHashCL2D::UpdateDensityPerBlock(uint64_t idx, uint64_t size) {
     for (uint64_t i = idx; i < min(idx + size, pos_.size()); ++i) {
         UpdateDensityKernel(i);
     }
 }
-void EngineHash2D::UpdateDensityKernel(uint64_t idx) {
+void EngineHashCL2D::UpdateDensityKernel(uint64_t idx) {
     rho_[idx] = 0;
     const auto& pos = pos_[idx];
     auto blockX = static_cast<uint32_t>(pos.x[0]) / static_cast<uint32_t>(SMOOTHING_LENGTH);
@@ -288,7 +288,7 @@ void EngineHash2D::UpdateDensityKernel(uint64_t idx) {
     }
 }
 
-void EngineHash2D::UpdatePressure() {
+void EngineHashCL2D::UpdatePressure() {
     auto blockNum = std::thread::hardware_concurrency();
     auto blockSize = pos_.size() / blockNum + static_cast<uint64_t>(pos_.size() % blockNum > 0);
     vector<future<void>> retVal;
@@ -298,14 +298,14 @@ void EngineHash2D::UpdatePressure() {
     }
     for_each(retVal.begin(), retVal.end(), [](future<void>& iter) { iter.wait(); });
 }
-void EngineHash2D::UpdatePressurePerBlock(uint64_t idx, uint64_t size) {
+void EngineHashCL2D::UpdatePressurePerBlock(uint64_t idx, uint64_t size) {
     for (uint64_t i = idx; i < min(idx + size, pos_.size()); ++i) {
         UpdatePressureKernel(i);
     }
 }
-void EngineHash2D::UpdatePressureKernel(uint64_t idx) { p_[idx] = ISOTROPIC_EXPONENT * (rho_[idx] - BASE_DENSITY); }
+void EngineHashCL2D::UpdatePressureKernel(uint64_t idx) { p_[idx] = ISOTROPIC_EXPONENT * (rho_[idx] - BASE_DENSITY); }
 
-void EngineHash2D::UpdateForce() {
+void EngineHashCL2D::UpdateForce() {
     auto blockNum = std::thread::hardware_concurrency();
     auto blockSize = pos_.size() / blockNum + static_cast<uint64_t>(pos_.size() % blockNum > 0);
     vector<future<void>> retVal;
@@ -315,12 +315,12 @@ void EngineHash2D::UpdateForce() {
     }
     for_each(retVal.begin(), retVal.end(), [](future<void>& iter) { iter.wait(); });
 }
-void EngineHash2D::UpdateForcePerBlock(uint64_t idx, uint64_t size) {
+void EngineHashCL2D::UpdateForcePerBlock(uint64_t idx, uint64_t size) {
     for (uint64_t i = idx; i < min(idx + size, pos_.size()); ++i) {
         UpdateForceKernel(i);
     }
 }
-void EngineHash2D::UpdateForceKernel(uint64_t idx) {
+void EngineHashCL2D::UpdateForceKernel(uint64_t idx) {
     f_[idx] = {0, 0};
     const auto& pos = pos_[idx];
     auto blockX = static_cast<uint32_t>(pos.x[0]) / static_cast<uint32_t>(SMOOTHING_LENGTH);
