@@ -197,7 +197,7 @@ void EngineHashCL2D::UpdateHashKernel(uint64_t idx) {
     bucket_[idx].second = hash;
     bucketKeyStartIdxMap_[idx] = INT32_MAX;
 #ifdef VERIFY_SORT
-    unsortedBucket_[i] = hash;
+    unsortedBucket_[idx] = hash;
 #endif
 }
 
