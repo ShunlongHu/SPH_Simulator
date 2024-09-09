@@ -134,10 +134,10 @@ inline void BitonicMergeSort(vector<uint32_t>& value, vector<uint32_t>& idx, Thr
         for (uint32_t j = 0; j < i; ++j) {
             retVal.resize(0);
             for (uint32_t start = 0; start < value.size() / 2; start += blockSize) {
-                //                retVal.emplace_back(pool.enqueue(BitonicMergeSortBlock, std::ref(value), std::ref(idx), start,
-                //                                                 blockSize, compareBlockSize, compareBlockSizePow, dirChangePerIdxPow));
-                BitonicMergeSortBlock(std::ref(value), std::ref(idx), start, blockSize, compareBlockSize,
-                                      compareBlockSizePow, dirChangePerIdxPow);
+                retVal.emplace_back(pool.enqueue(BitonicMergeSortBlock, std::ref(value), std::ref(idx), start,
+                                                 blockSize, compareBlockSize, compareBlockSizePow, dirChangePerIdxPow));
+                //                BitonicMergeSortBlock(std::ref(value), std::ref(idx), start, blockSize, compareBlockSize,
+                //                                      compareBlockSizePow, dirChangePerIdxPow);
             }
             //            cout << endl;
             compareBlockSize /= 2;

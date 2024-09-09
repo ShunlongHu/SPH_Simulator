@@ -37,7 +37,6 @@ EngineHashCL2D::EngineHashCL2D(int particleNum) {
     xyzsVec_.resize(particleNum * 4);
     colorVec_.resize(particleNum * 4);
 
-    bucketIdxIdxMap_.resize(particleNum);
     bucketKeyStartIdxMap_.resize(particleNum);
     bucket_.resize(particleNum);
     unsortedBucket_.resize(particleNum);
@@ -82,22 +81,18 @@ inline float Distance(const Pos<2>& pos1, const Pos<2>& pos2) {
     return sqrt((pos1.x[0] - pos2.x[0]) * (pos1.x[0] - pos2.x[0]) + (pos1.x[1] - pos2.x[1]) * (pos1.x[1] - pos2.x[1]));
 }
 
-inline void BitonicMergeSortKernel(vector<uint32_t>& value, vector<uint32_t>& idx, uint32_t i,
-                                   uint32_t compareBlockSize, uint32_t compareBlockSizePow,
-                                   uint32_t dirChangePerIdxPow) {
+inline void BitonicMergeSortKernel(vector<std::pair<uint32_t, uint32_t>>& value, uint32_t i, uint32_t compareBlockSize,
+                                   uint32_t compareBlockSizePow, uint32_t dirChangePerIdxPow) {
     auto blockIdx = i >> (compareBlockSizePow - 1);
     bool dir = (i >> dirChangePerIdxPow) & 1;
     auto changeIdx = i & ((compareBlockSize >> 1) - 1);
     auto lessIdx = dir == 0 ? (blockIdx << compareBlockSizePow) + changeIdx
                             : (((blockIdx + 1) << compareBlockSizePow) - 1) - changeIdx;
     auto greaterIdx = dir == 0 ? lessIdx + (compareBlockSize >> 1) : lessIdx - (compareBlockSize >> 1);
-    if (value[lessIdx] > value[greaterIdx]) {
+    if (value[lessIdx].second > value[greaterIdx].second) {
         auto tVal = value[lessIdx];
         value[lessIdx] = value[greaterIdx];
         value[greaterIdx] = tVal;
-        auto tIdx = idx[lessIdx];
-        idx[lessIdx] = idx[greaterIdx];
-        idx[greaterIdx] = tIdx;
     }
     //    if (dir == 0) {
     //        cout << lessIdx << " -> " << greaterIdx << " ; ";
@@ -106,15 +101,15 @@ inline void BitonicMergeSortKernel(vector<uint32_t>& value, vector<uint32_t>& id
     //    }
 }
 
-void BitonicMergeSortBlock(vector<uint32_t>& value, vector<uint32_t>& idx, uint32_t start, uint32_t size,
+void BitonicMergeSortBlock(vector<std::pair<uint32_t, uint32_t>>& value, uint32_t start, uint32_t size,
                            uint32_t compareBlockSize, uint32_t compareBlockSizePow, uint32_t dirChangePerIdxPow) {
     auto stop = min<uint32_t>(value.size() / 2, start + size);
     for (uint32_t i = start; i < stop; ++i) {
-        BitonicMergeSortKernel(value, idx, i, compareBlockSize, compareBlockSizePow, dirChangePerIdxPow);
+        BitonicMergeSortKernel(value, i, compareBlockSize, compareBlockSizePow, dirChangePerIdxPow);
     }
 }
 
-inline void BitonicMergeSort(vector<uint32_t>& value, vector<uint32_t>& idx, ThreadPool& pool) {
+inline void BitonicMergeSort(vector<std::pair<uint32_t, uint32_t>>& value, ThreadPool& pool) {
     auto blockNum = std::thread::hardware_concurrency();
     auto blockSize = value.size() / blockNum + static_cast<uint64_t>(value.size() % blockNum > 0);
     vector<future<void>> retVal;
@@ -125,8 +120,7 @@ inline void BitonicMergeSort(vector<uint32_t>& value, vector<uint32_t>& idx, Thr
         stage++;
     }
     auto origSize = value.size();
-    value.resize(nextPowOfTwo, UINT32_MAX);
-    idx.resize(nextPowOfTwo);
+    value.resize(nextPowOfTwo, {UINT32_MAX, UINT32_MAX});
     uint32_t dirChangePerIdxPow = 0;
     for (uint32_t i = 1; i < stage + 1; ++i) {
         uint32_t compareBlockSize = 1 << i;
@@ -134,10 +128,8 @@ inline void BitonicMergeSort(vector<uint32_t>& value, vector<uint32_t>& idx, Thr
         for (uint32_t j = 0; j < i; ++j) {
             retVal.resize(0);
             for (uint32_t start = 0; start < value.size() / 2; start += blockSize) {
-                //                retVal.emplace_back(pool.enqueue(BitonicMergeSortBlock, std::ref(value), std::ref(idx), start,
-                //                                                 blockSize, compareBlockSize, compareBlockSizePow, dirChangePerIdxPow));
-                BitonicMergeSortBlock(std::ref(value), std::ref(idx), start, blockSize, compareBlockSize,
-                                      compareBlockSizePow, dirChangePerIdxPow);
+                retVal.emplace_back(pool.enqueue(BitonicMergeSortBlock, std::ref(value), start, blockSize,
+                                                 compareBlockSize, compareBlockSizePow, dirChangePerIdxPow));
             }
             //            cout << endl;
             compareBlockSize /= 2;
@@ -151,7 +143,6 @@ inline void BitonicMergeSort(vector<uint32_t>& value, vector<uint32_t>& idx, Thr
 
 
     value.resize(origSize);
-    idx.resize(origSize);
 }
 inline void VerifySort(const vector<uint32_t>& value, const vector<uint32_t>& idx, const vector<uint32_t>& origValue) {
     for (uint32_t i = 1; i < value.size(); ++i) {
@@ -168,15 +159,16 @@ inline void VerifySort(const vector<uint32_t>& value, const vector<uint32_t>& id
     }
 }
 
-inline void CalcStartIdx(const vector<uint32_t>& bucket, vector<uint32_t>& startIdx, uint32_t idx) {
-    if (idx == 0 || bucket[idx] != bucket[idx - 1]) {
-        startIdx[bucket[idx]] = idx;
+inline void CalcStartIdx(const vector<std::pair<uint32_t, uint32_t>>& bucket, vector<uint32_t>& startIdx,
+                         uint32_t idx) {
+    if (idx == 0 || bucket[idx].second != bucket[idx - 1].second) {
+        startIdx[bucket[idx].second] = idx;
     }
 }
 
 void EngineHashCL2D::UpdateBucket() {
     UpdateHash();
-    BitonicMergeSort(bucket_, bucketIdxIdxMap_, pool_);
+    BitonicMergeSort(bucket_, pool_);
 #ifdef VERIFY_SORT
     VerifySort(bucket_, bucketIdxIdxMap_, unsortedBucket_);
 #endif
@@ -201,8 +193,8 @@ void EngineHashCL2D::UpdateHashPerBlock(uint64_t idx, uint64_t size) {
 void EngineHashCL2D::UpdateHashKernel(uint64_t idx) {
     auto key = CalcBucketHash(pos_[idx]);
     auto hash = key % pos_.size();
-    bucketIdxIdxMap_[idx] = idx;
-    bucket_[idx] = hash;
+    bucket_[idx].first = idx;
+    bucket_[idx].second = hash;
     bucketKeyStartIdxMap_[idx] = INT32_MAX;
 #ifdef VERIFY_SORT
     unsortedBucket_[i] = hash;
@@ -296,11 +288,10 @@ void EngineHashCL2D::UpdateDensityKernel(uint64_t idx) {
             auto tgtKey = CalcBucketHash(bx, by) % pos_.size();
             auto tgtKeyStartIdx = bucketKeyStartIdxMap_[tgtKey];
             for (uint32_t tgtBucketIdx = tgtKeyStartIdx; tgtBucketIdx < bucketKeyStartIdxMap_.size(); ++tgtBucketIdx) {
-                if (bucket_[tgtBucketIdx] != tgtKey) {
+                if (bucket_[tgtBucketIdx].second != tgtKey) {
                     break;
                 }
-
-                auto tgt = bucketIdxIdxMap_[tgtBucketIdx];
+                auto tgt = bucket_[tgtBucketIdx].first;
                 auto tgtBx = static_cast<uint32_t>(pos_[tgt].x[0]) / static_cast<uint32_t>(SMOOTHING_LENGTH);
                 auto tgtBy = static_cast<uint32_t>(pos_[tgt].x[1]) / static_cast<uint32_t>(SMOOTHING_LENGTH);
                 if (tgtBx != bx || tgtBy != by) {
@@ -359,10 +350,10 @@ void EngineHashCL2D::UpdateForceKernel(uint64_t idx) {
             auto tgtKey = CalcBucketHash(bx, by) % pos_.size();
             auto tgtKeyStartIdx = bucketKeyStartIdxMap_[tgtKey];
             for (uint32_t tgtBucketIdx = tgtKeyStartIdx; tgtBucketIdx < bucketKeyStartIdxMap_.size(); ++tgtBucketIdx) {
-                if (bucket_[tgtBucketIdx] != tgtKey) {
+                if (bucket_[tgtBucketIdx].second != tgtKey) {
                     break;
                 }
-                auto tgt = bucketIdxIdxMap_[tgtBucketIdx];
+                auto tgt = bucket_[tgtBucketIdx].first;
                 auto tgtBx = static_cast<uint32_t>(pos_[tgt].x[0]) / static_cast<uint32_t>(SMOOTHING_LENGTH);
                 auto tgtBy = static_cast<uint32_t>(pos_[tgt].x[1]) / static_cast<uint32_t>(SMOOTHING_LENGTH);
                 if (tgtBx != bx || tgtBy != by) {

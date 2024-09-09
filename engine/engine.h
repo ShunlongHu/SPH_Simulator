@@ -4,8 +4,6 @@
 
 #ifndef TUTORIALS_ENGINE_H
 #define TUTORIALS_ENGINE_H
-#include <CL/cl.h>
-
 #include <cmath>
 #include <cstdint>
 #include <unordered_map>
@@ -22,44 +20,6 @@ struct Pos {
     float x[Dim]{};
 };
 #endif
-
-struct ClObj {
-    ClObj() = default;
-    ~ClObj() {
-        clFlush(commandQueue);
-        clFinish(commandQueue);
-        clReleaseKernel(kernel);
-        clReleaseProgram(program);
-
-        clReleaseMemObject(aBuff);
-        clReleaseMemObject(bBuff);
-        clReleaseMemObject(cBuff);
-
-        clReleaseCommandQueue(commandQueue);
-        clReleaseContext(context);
-    }
-
-    cl_platform_id platformId = nullptr;
-    cl_uint retNumPlatforms;
-    cl_device_id deviceId = nullptr;
-    cl_uint retNumDevices;
-    cl_context context = nullptr;
-    cl_kernel kernel = nullptr;
-    cl_program program = nullptr;
-    cl_command_queue commandQueue = nullptr;
-
-
-    cl_kernel findBucketKernel = nullptr;
-    cl_kernel findPairKernel = nullptr;
-    cl_kernel concatPairKernel = nullptr;
-    cl_kernel updateVelocity = nullptr;
-    cl_kernel updateBucket = nullptr;
-    cl_kernel updateDensity = nullptr;
-    cl_kernel updatePressure = nullptr;
-    cl_kernel updateForce = nullptr;
-
-    cl_mem aBuff, bBuff, cBuff;
-};
 class Engine2D {
 public:
     explicit Engine2D(int particleNum);
@@ -83,7 +43,6 @@ public:
     const std::vector<float>& GetColor();
 
 
-    ClObj obj_;
     std::vector<Pos<2>> pos_{};
     std::vector<Pos<2>> u_{};
     std::vector<Pos<2>> f_{};

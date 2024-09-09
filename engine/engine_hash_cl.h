@@ -4,7 +4,8 @@
 
 #ifndef TUTORIALS_ENGINE_HASH_CL_H
 #define TUTORIALS_ENGINE_HASH_CL_H
-#include <CL/cl2.hpp>
+#define CL_HPP_TARGET_OPENCL_VERSION 300
+#include <CL/opencl.hpp>
 #include <cmath>
 #include <cstdint>
 #include <unordered_map>
@@ -61,11 +62,9 @@ public:
     std::vector<float> colorVec_{};
 
     std::vector<uint32_t> unsortedBucket_{};
-    std::vector<uint32_t> bucket_{};
-    std::vector<uint32_t> bucketIdxIdxMap_{};
+    std::vector<std::pair<uint32_t, uint32_t>> bucket_{};// key, idx
     std::vector<uint32_t> bucketKeyStartIdxMap_{};
 
-    std::vector<uint32_t> distance_{};
     ThreadPool pool_{std::thread::hardware_concurrency()};
 
     float time_{0};
@@ -99,8 +98,31 @@ public:
                                      SMOOTHING_LENGTH * SMOOTHING_LENGTH);
     constexpr static float NORMALIZATION_VISCOUS_FORCE = -NORMALIZATION_PRESSURE_FORCE * DYNAMIC_VISCOSITY;
 
-    cl::Context ctx;
-    cl::Program program;
+
+    // OpenCL members
+    cl::Context ctx_;
+    cl::Program program_;
+    std::vector<size_t> localSize;
+    cl::Kernel hashKernel_;
+    cl::Kernel startIdxKernel_;
+    cl::Kernel densityKernel_;
+    cl::Kernel pressureKernel_;
+    cl::Kernel forceKernel_;
+    cl::Kernel posVelocityKernel_;
+    cl::Kernel sortStartKernel_;
+    cl::Kernel sortLocalKernel_;
+    cl::Kernel sortGlobalKernel_;
+    cl::Buffer bucketInBuf_;// key, idx
+    cl::Buffer bucketOutBuf_;
+    cl::Buffer unsortedBucketBuf_;
+    cl::Buffer bucketKeyStartIdxMapBuf_;
+    cl::Buffer posBuf_;
+    cl::Buffer uBuf_;
+    cl::Buffer fBuf_;
+    cl::Buffer pBuf_{};
+    cl::Buffer rhoBuf_{};
+    cl::Buffer xyzsVecBuf_{};
+    cl::Buffer colorVecBuf_{};
 };
 
 }// namespace Sph

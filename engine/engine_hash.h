@@ -4,8 +4,6 @@
 
 #ifndef TUTORIALS_ENGINE_HASH_H
 #define TUTORIALS_ENGINE_HASH_H
-#include <CL/cl.h>
-
 #include <cmath>
 #include <cstdint>
 #include <unordered_map>
