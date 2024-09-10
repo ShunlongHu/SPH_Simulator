@@ -1,1 +1,7 @@
-find_package(OpenCL REQUIRED)
+if (${OPENCL_BUILD} STREQUAL CUDA)
+    find_package(CUDAToolkit REQUIRED)
+    set(OPENCL_LIB CUDA::OpenCL)
+else ()
+    find_package(OpenCL REQUIRED)
+    set(OPENCL_LIB OpenCL::OpenCL)
+endif ()

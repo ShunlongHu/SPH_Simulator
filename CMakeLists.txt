@@ -1,5 +1,5 @@
 # CMake entry point
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.17)
 project(Tutorials)
 
 include(cmake/find_opengl.cmake)
