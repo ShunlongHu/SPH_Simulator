@@ -8,6 +8,8 @@
 #include <fstream>
 #include <iostream>
 
+#include "cl_utils.h"
+
 //#define VERIFY_SORT
 using namespace std;
 namespace Sph {
@@ -27,7 +29,9 @@ inline uint32_t CalcBucketHash(uint32_t bucketX, uint32_t bucketY) {
 }
 
 
-EngineHashCL2D::EngineHashCL2D(int particleNum) {
+EngineHashCL2D::EngineHashCL2D(int particleNum) : particleNum_(particleNum) {
+    for (; nextPowOf2_ < particleNum_; nextPowOf2_ *= 2) {
+    }
     srand(0);
     pos_.resize(particleNum);
     u_.resize(particleNum);
@@ -46,6 +50,7 @@ EngineHashCL2D::EngineHashCL2D(int particleNum) {
         float x = -(static_cast<float>(rand()) / RAND_MAX) * (DOMAIN_X_LIM[1] - DOMAIN_X_LIM[0]) / 2 + DOMAIN_X_LIM[1];
         pos_[i] = {x, y};
     }
+    InitOpenCl(particleNum);
 }
 
 const std::vector<float>& EngineHashCL2D::GetColor() {
@@ -166,9 +171,57 @@ inline void CalcStartIdx(const vector<std::pair<uint32_t, uint32_t>>& bucket, ve
     }
 }
 
+inline size_t GetGlobalWorkSize(size_t DataElemCount, size_t LocalWorkSize) {
+    size_t r = DataElemCount % LocalWorkSize;
+    if (r == 0) return DataElemCount;
+    else
+        return DataElemCount + LocalWorkSize - r;
+}
+
+void EngineHashCL2D::BitonicMergeSortCL() {
+    uint32_t nextPowOf2 = 2;
+    size_t globalWorkSize[1];
+
+    globalWorkSize[0] = GetGlobalWorkSize(nextPowOf2_ / 2, localWorkSize_[0]);
+    unsigned int limit = (unsigned int) 2 * localWorkSize_[0];//limit is double the localWorkSize_
+
+    // start with Sort_BitonicMergesortLocalBegin to sort local until we reach the limit
+    sortStartKernel_.setArg(0, bucketInBuf_);
+    sortStartKernel_.setArg(1, bucketOutBuf_);
+
+    q_.enqueueNDRangeKernel(sortStartKernel_, {}, globalWorkSize[0], localWorkSize_[0], {});
+
+    // proceed with global and local kernels
+    for (unsigned int blocksize = limit; blocksize <= nextPowOf2_; blocksize <<= 1) {
+        for (unsigned int stride = blocksize / 2; stride > 0; stride >>= 1) {
+            if (stride >= limit) {
+                //Sort_BitonicMergesortGlobal
+                sortGlobalKernel_.setArg(0, bucketOutBuf_);
+                sortGlobalKernel_.setArg(1, nextPowOf2_);
+                sortGlobalKernel_.setArg(2, blocksize);
+                sortGlobalKernel_.setArg(3, stride);
+
+                q_.enqueueNDRangeKernel(sortGlobalKernel_, {}, globalWorkSize[0], localWorkSize_[0], {});
+            } else {
+                //Sort_BitonicMergesortLocal
+                sortLocalKernel_.setArg(0, bucketOutBuf_);
+                sortLocalKernel_.setArg(1, nextPowOf2_);
+                sortLocalKernel_.setArg(2, blocksize);
+                sortLocalKernel_.setArg(3, stride);
+
+                q_.enqueueNDRangeKernel(sortLocalKernel_, {}, globalWorkSize[0], localWorkSize_[0], {});
+            }
+        }
+    }
+    swap(bucketInBuf_, bucketOutBuf_);
+    q_.enqueueReadBuffer(bucketInBuf_, CL_TRUE, 0, nextPowOf2_ * sizeof(uint32_t) * 2, bucket_.data());
+}
+
 void EngineHashCL2D::UpdateBucket() {
-    UpdateHash();
-    BitonicMergeSort(bucket_, pool_);
+    UpdateHashCL();
+    BitonicMergeSortCL();
+//    UpdateHash();
+//    BitonicMergeSort(bucket_, pool_);
 #ifdef VERIFY_SORT
     VerifySort(bucket_, bucketIdxIdxMap_, unsortedBucket_);
 #endif
@@ -380,5 +433,68 @@ void EngineHashCL2D::UpdateForceKernel(uint64_t idx) {
             }
         }
     }
+}
+void EngineHashCL2D::InitOpenCl(int particleNum) {
+    // Read shader
+    string fName = "shader/particles.cl";
+    ifstream ifs(fName);
+    if (!ifs.is_open()) {
+        cerr << "Failed to open " << fName << endl;
+    }
+    ifs.seekg(0, ios_base::end);
+    auto size = ifs.tellg();
+    ifs.seekg(0, ios_base::beg);
+    string prog(size, '\0');
+    ifs.read(prog.data(), size);
+
+    // Get local size
+    cout << GetPlatformName(0) << endl;
+    cout << GetDeviceName(0, 0) << endl;
+    ctx_ = GetContext(0, 0);
+    localWorkSize_ = GetLocalWorkgroupSize(0, 0);
+
+    // load prog
+    prog = "#define MAX_LOCAL_SIZE " + to_string(localWorkSize_[0]) + '\n' + prog;
+    cl_int ret;
+    program_ = cl::Program(prog, true, &ret);
+    if (ret != CL_SUCCESS) {
+        cout << getErrorString(ret) << endl;
+        cout << GetBuildLog(program_, 0, 0) << endl;
+        exit(-1);
+    }
+
+    // load kernel
+    hashKernel_ = cl::Kernel(program_, "UpdateHashKernel");
+    sortStartKernel_ = cl::Kernel(program_, "Sort_BitonicMergesortStart");
+    sortLocalKernel_ = cl::Kernel(program_, "Sort_BitonicMergesortLocal");
+    sortGlobalKernel_ = cl::Kernel(program_, "Sort_BitonicMergesortGlobal");
+
+    // load context
+    ctx_ = GetContext(0, 0);
+    q_ = cl::CommandQueue(ctx_);
+
+    // create buffer
+    posBuf_ = cl::Buffer(ctx_, CL_MEM_READ_WRITE, particleNum * sizeof(float) * 2);
+    bucketInBuf_ = cl::Buffer(ctx_, CL_MEM_READ_WRITE, nextPowOf2_ * sizeof(uint32_t) * 2);
+    bucketOutBuf_ = cl::Buffer(ctx_, CL_MEM_READ_WRITE, nextPowOf2_ * sizeof(uint32_t) * 2);
+    bucketKeyStartIdxMapBuf_ = cl::Buffer(ctx_, CL_MEM_READ_WRITE, nextPowOf2_ * sizeof(uint32_t));
+
+
+    //    cl::Kernel startIdxKernel_;
+    //    cl::Kernel densityKernel_;
+    //    cl::Kernel pressureKernel_;
+    //    cl::Kernel forceKernel_;
+    //    cl::Kernel posVelocityKernel_;
+}
+void EngineHashCL2D::UpdateHashCL() {
+    q_.enqueueWriteBuffer(posBuf_, CL_TRUE, 0, particleNum_ * sizeof(float) * 2, pos_.data());
+    hashKernel_.setArg(0, posBuf_);
+    hashKernel_.setArg(1, bucketInBuf_);
+    hashKernel_.setArg(2, bucketKeyStartIdxMapBuf_);
+    hashKernel_.setArg(3, particleNum_);
+    hashKernel_.setArg(4, SMOOTHING_LENGTH);
+    q_.enqueueNDRangeKernel(hashKernel_, {}, {nextPowOf2_}, {});
+    q_.enqueueReadBuffer(bucketKeyStartIdxMapBuf_, CL_TRUE, 0, nextPowOf2_ * sizeof(uint32_t),
+                         bucketKeyStartIdxMap_.data());
 }
 }// namespace Sph

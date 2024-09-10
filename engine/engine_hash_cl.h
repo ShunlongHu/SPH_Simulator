@@ -26,6 +26,7 @@ class EngineHashCL2D {
 public:
     explicit EngineHashCL2D(int particleNum);
     ~EngineHashCL2D() = default;
+    void InitOpenCl(int particleNum);
     void Step();
     void StepOne();
     void UpdateBucket();
@@ -35,6 +36,15 @@ public:
     void UpdateDensity();
     void UpdatePressure();
     void UpdateForce();
+
+    void UpdateBucketCL();
+    void UpdateHashCL();
+    void UpdateStartIdxCL();
+    void UpdatePosVelocityCL();
+    void UpdateDensityCL();
+    void UpdatePressureCL();
+    void UpdateForceCL();
+    void BitonicMergeSortCL();
 
     void UpdateHashPerBlock(uint64_t idx, uint64_t size);
     void UpdateHashKernel(uint64_t idx);
@@ -72,13 +82,13 @@ public:
     constexpr static float PARTICLE_MASS = 1;
     constexpr static float ISOTROPIC_EXPONENT = 200;
     constexpr static float BASE_DENSITY = 0.025;
-    constexpr static uint64_t SMOOTHING_LENGTH = 5;
+    constexpr static float SMOOTHING_LENGTH = 5;
     constexpr static float DYNAMIC_VISCOSITY = 0.1;
     constexpr static float DAMPING_COEFFICIENT = -0.3;
     constexpr static Pos<2> G_FORCE = {0, -0.1};
     constexpr static float DT = 0.01;
-    constexpr static uint64_t DOMAIN_WIDTH = 240;
-    constexpr static uint64_t DOMAIN_HEIGHT = 160;
+    constexpr static float DOMAIN_WIDTH = 240;
+    constexpr static float DOMAIN_HEIGHT = 160;
     constexpr static float MAX_ACC = 100;
 
     constexpr static float DOMAIN_X_LIM[2] = {
@@ -100,9 +110,12 @@ public:
 
 
     // OpenCL members
+    uint32_t particleNum_;
+    uint32_t nextPowOf2_{2};
     cl::Context ctx_;
     cl::Program program_;
-    std::vector<size_t> localSize;
+    std::vector<size_t> localWorkSize_;
+    cl::CommandQueue q_;
     cl::Kernel hashKernel_;
     cl::Kernel startIdxKernel_;
     cl::Kernel densityKernel_;

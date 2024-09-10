@@ -33,7 +33,6 @@ Engine2D::Engine2D(int particleNum) {
         pos_[i] = {x, y};
         idxBucket_[CalcBucket(pos_[i])].emplace(i);
     }
-    InitCl();
 }
 const std::vector<float>& Engine2D::GetColor() {
     for (uint64_t i = 0; i < rho_.size(); ++i) {

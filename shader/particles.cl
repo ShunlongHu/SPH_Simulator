@@ -1,34 +1,34 @@
-#define MAX_LOCAL_SIZE 256//set via compile options
-
+// #define MAX_LOCAL_SIZE 256//set via compile options
+#define INT32_MAX 0x7FFFFFFF
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // needed helper methods
-inline void swap(uint *a, uint *b) {
-    uint tmp;
+inline void swap(uint2 *a, uint2 *b) {
+    uint2 tmp;
     tmp = *b;
     *b = *a;
     *a = tmp;
 }
 
 // dir == 1 means ascending
-inline void sort(uint *a, uint *b, char dir) {
-    if ((*a > *b) == dir) swap(a, b);
+inline void sort(uint2 *a, uint2 *b, char dir) {
+    if ((a->y > b->y) == dir) swap(a, b);
 }
 
-inline void swapLocal(__local uint *a, __local uint *b) {
-    uint tmp;
+inline void swapLocal(__local uint2 *a, __local uint2 *b) {
+    uint2 tmp;
     tmp = *b;
     *b = *a;
     *a = tmp;
 }
 
 // dir == 1 means ascending
-inline void sortLocal(__local uint *a, __local uint *b, char dir) {
-    if ((*a > *b) == dir) swapLocal(a, b);
+inline void sortLocal(__local uint2 *a, __local uint2 *b, char dir) {
+    if ((a->y > b->y) == dir) swapLocal(a, b);
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-__kernel void Sort_BitonicMergesortStart(const __global uint *inArray, __global uint *outArray) {
-    __local uint local_buffer[MAX_LOCAL_SIZE * 2];
+__kernel void Sort_BitonicMergesortStart(const __global uint2 *inArray, __global uint2 *outArray) {
+    __local uint2 local_buffer[MAX_LOCAL_SIZE * 2];
     const uint gid = get_global_id(0);
     const uint lid = get_local_id(0);
 
@@ -66,9 +66,9 @@ __kernel void Sort_BitonicMergesortStart(const __global uint *inArray, __global 
     outArray[index + MAX_LOCAL_SIZE] = local_buffer[lid + MAX_LOCAL_SIZE];
 }
 
-__kernel void Sort_BitonicMergesortLocal(__global uint *data, const uint size, const uint blocksize, uint stride) {
+__kernel void Sort_BitonicMergesortLocal(__global uint2 *data, const uint size, const uint blocksize, uint stride) {
     // This Kernel is basically the same as Sort_BitonicMergesortStart except of the "unrolled" part and the provided parameters
-    __local uint local_buffer[2 * MAX_LOCAL_SIZE];
+    __local uint2 local_buffer[2 * MAX_LOCAL_SIZE];
     uint gid = get_global_id(0);
     uint groupId = get_group_id(0);
     uint lid = get_local_id(0);
@@ -94,7 +94,7 @@ __kernel void Sort_BitonicMergesortLocal(__global uint *data, const uint size, c
     data[index + MAX_LOCAL_SIZE] = local_buffer[lid + MAX_LOCAL_SIZE];
 }
 
-__kernel void Sort_BitonicMergesortGlobal(__global uint *data, const uint size, const uint blocksize,
+__kernel void Sort_BitonicMergesortGlobal(__global uint2 *data, const uint size, const uint blocksize,
                                           const uint stride) {
     // TO DO: Kernel implementation
     uint gid = get_global_id(0);
@@ -105,8 +105,8 @@ __kernel void Sort_BitonicMergesortGlobal(__global uint *data, const uint size, 
     char dir = (clampedGID & (blocksize / 2)) == 0;//same as above, % calc
 
     //bitonic merge
-    uint left = data[index];
-    uint right = data[index + stride];
+    uint2 left = data[index];
+    uint2 right = data[index + stride];
 
     sort(&left, &right, dir);
 
@@ -116,3 +116,34 @@ __kernel void Sort_BitonicMergesortGlobal(__global uint *data, const uint size, 
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+inline uint CalcBucketHash(const float2 pos, const uint SMOOTHING_LENGTH) {
+    static const uint hashK1 = 15823;
+    static const uint hashK2 = 9737333;
+    static const uint hashK3 = 440817757;
+    uint2 posInt = convert_uint2(pos);
+    uint smooth = (uint) SMOOTHING_LENGTH;
+    return (posInt.x / smooth) * hashK1 + (posInt.y / smooth) * hashK2;
+}
+
+inline uint CalcBucketHashFromBucketLoc(uint bucketX, uint bucketY) {
+    static const uint hashK1 = 15823;
+    static const uint hashK2 = 9737333;
+    static const uint hashK3 = 440817757;
+    return bucketX * hashK1 + bucketY * hashK2;
+}
+
+__kernel void UpdateHashKernel(__global float2 *pos, __global uint2 *bucket, __global uint *bucketKeyStartIdxMap,
+                               const uint size, const float SMOOTHING_LENGTH) {
+    int idx = get_global_id(0);
+    uint key = CalcBucketHash(pos[idx], SMOOTHING_LENGTH);
+    uint hash = key % size;
+    bucketKeyStartIdxMap[idx] = INT32_MAX;
+    if (idx < size) {
+        bucket[idx].x = idx;
+        bucket[idx].y = hash;
+    } else {
+        bucket[idx].x = INT32_MAX;
+        bucket[idx].y = INT32_MAX;
+    }
+}
