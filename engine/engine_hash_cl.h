@@ -30,50 +30,20 @@ public:
     void Step();
     void StepOne();
     void UpdateBucket();
-    void UpdateHash();
-    void UpdateStartIdx();
-    void UpdatePosVelocity();
-    void UpdateDensity();
-    void UpdatePressure();
-    void UpdateForce();
-
-    void UpdateBucketCL();
     void UpdateHashCL();
     void UpdateStartIdxCL();
     void UpdatePosVelocityCL();
-    void UpdateDensityCL();
-    void UpdatePressureCL();
+    void UpdateDensityPressureCL();
     void UpdateForceCL();
     void BitonicMergeSortCL();
-
-    void UpdateHashPerBlock(uint64_t idx, uint64_t size);
-    void UpdateHashKernel(uint64_t idx);
-    void UpdateStartIdxPerBlock(uint64_t idx, uint64_t size);
-    void UpdateStartIdxKernel(uint64_t idx);
-    void UpdateDensityPerBlock(uint64_t idx, uint64_t size);
-    void UpdateDensityKernel(uint64_t idx);
-    void UpdatePressurePerBlock(uint64_t idx, uint64_t size);
-    void UpdatePressureKernel(uint64_t idx);
-    void UpdateForcePerBlock(uint64_t idx, uint64_t size);
-    void UpdateForceKernel(uint64_t idx);
-    void UpdatePosVelocityPerBlock(uint64_t idx, uint64_t size);
-    void UpdatePosVelocityKernel(uint64_t idx);
 
     // opencl
     const std::vector<float>& GetXyzs();
     const std::vector<float>& GetColor();
 
     std::vector<Pos<2>> pos_{};
-    std::vector<Pos<2>> u_{};
-    std::vector<Pos<2>> f_{};
-    std::vector<float> p_{};
-    std::vector<float> rho_{};
     std::vector<float> xyzsVec_{};
     std::vector<float> colorVec_{};
-
-    std::vector<uint32_t> unsortedBucket_{};
-    std::vector<std::pair<uint32_t, uint32_t>> bucket_{};// key, idx
-    std::vector<uint32_t> bucketKeyStartIdxMap_{};
 
     ThreadPool pool_{std::thread::hardware_concurrency()};
 
@@ -118,13 +88,14 @@ public:
     cl::CommandQueue q_;
     cl::Kernel hashKernel_;
     cl::Kernel startIdxKernel_;
-    cl::Kernel densityKernel_;
-    cl::Kernel pressureKernel_;
+    cl::Kernel densityPressureKernel_;
     cl::Kernel forceKernel_;
     cl::Kernel posVelocityKernel_;
     cl::Kernel sortStartKernel_;
     cl::Kernel sortLocalKernel_;
     cl::Kernel sortGlobalKernel_;
+    cl::Kernel colorKernel_;
+    cl::Kernel xyzsKernel_;
     cl::Buffer bucketInBuf_;// key, idx
     cl::Buffer bucketOutBuf_;
     cl::Buffer unsortedBucketBuf_;
@@ -134,8 +105,8 @@ public:
     cl::Buffer fBuf_;
     cl::Buffer pBuf_{};
     cl::Buffer rhoBuf_{};
-    cl::Buffer xyzsVecBuf_{};
-    cl::Buffer colorVecBuf_{};
+    cl::Buffer xyzsBuf_{};
+    cl::Buffer colorBuf_{};
 };
 
 }// namespace Sph

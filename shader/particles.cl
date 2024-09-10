@@ -133,12 +133,15 @@ inline uint CalcBucketHashFromBucketLoc(uint bucketX, uint bucketY) {
     return bucketX * hashK1 + bucketY * hashK2;
 }
 
-__kernel void UpdateHashKernel(__global float2 *pos, __global uint2 *bucket, __global uint *bucketKeyStartIdxMap,
-                               const uint size, const float SMOOTHING_LENGTH) {
+inline float Distance(const float2 pos1, float2 pos2) {
+    return sqrt((pos1.x - pos2.x) * (pos1.x - pos2.x) + (pos1.y - pos2.y) * (pos1.y - pos2.y));
+}
+
+__kernel void UpdateHashKernel(__global float2 *pos, __global uint2 *bucket, const uint size,
+                               const float SMOOTHING_LENGTH) {
     int idx = get_global_id(0);
     uint key = CalcBucketHash(pos[idx], SMOOTHING_LENGTH);
     uint hash = key % size;
-    bucketKeyStartIdxMap[idx] = INT32_MAX;
     if (idx < size) {
         bucket[idx].x = idx;
         bucket[idx].y = hash;
@@ -146,4 +149,135 @@ __kernel void UpdateHashKernel(__global float2 *pos, __global uint2 *bucket, __g
         bucket[idx].x = INT32_MAX;
         bucket[idx].y = INT32_MAX;
     }
+}
+
+__kernel void UpdateStartIdxKernel(__global const uint2 *bucket, __global uint *bucketKeyStartIdxMap) {
+    int idx = get_global_id(0);
+    if (idx == 0 || bucket[idx].y != bucket[idx - 1].y) {
+        bucketKeyStartIdxMap[bucket[idx].y] = idx;
+    }
+}
+__kernel void UpdateDensityPressureKernel(__global const uint2 *bucket, __global const uint *bucketKeyStartIdxMap,
+                                          __global const float2 *pos, __global float *rho, __global float *p,
+                                          const uint size, const float SMOOTHING_LENGTH,
+                                          const float NORMALIZATION_DENSITY, const float ISOTROPIC_EXPONENT,
+                                          const float BASE_DENSITY) {
+    int idx = get_global_id(0);
+    rho[idx] = 0;
+    uint blockX = (uint) (pos[idx].x) / (uint) (SMOOTHING_LENGTH);
+    uint blockY = (uint) (pos[idx].y) / (uint) (SMOOTHING_LENGTH);
+    for (uint by = blockY - 1; by != blockY + 2; ++by) {
+        for (uint bx = blockX - 1; bx != blockX + 2; ++bx) {
+            uint tgtKey = CalcBucketHashFromBucketLoc(bx, by) % size;
+            uint tgtKeyStartIdx = bucketKeyStartIdxMap[tgtKey];
+            for (uint tgtBucketIdx = tgtKeyStartIdx; tgtBucketIdx < size; ++tgtBucketIdx) {
+                if (bucket[tgtBucketIdx].y != tgtKey) {
+                    break;
+                }
+                uint tgt = bucket[tgtBucketIdx].x;
+                uint tgtBx = (uint) (pos[tgt].x) / (uint) (SMOOTHING_LENGTH);
+                uint tgtBy = (uint) (pos[tgt].y) / (uint) (SMOOTHING_LENGTH);
+                if (tgtBx != bx || tgtBy != by) {
+                    continue;
+                }
+                float dist = Distance(pos[idx], pos[tgt]);
+                if (dist >= SMOOTHING_LENGTH) {
+                    continue;
+                }
+                float squareDiff = (SMOOTHING_LENGTH * SMOOTHING_LENGTH - dist * dist);
+                rho[idx] += NORMALIZATION_DENSITY * squareDiff * squareDiff * squareDiff;
+            }
+        }
+    }
+    p[idx] = ISOTROPIC_EXPONENT * (rho[idx] - BASE_DENSITY);
+}
+
+
+__kernel void UpdateForceKernel(__global const uint2 *bucket, __global const uint *bucketKeyStartIdxMap,
+                                __global const float2 *pos, __global const float *rho, const __global float *p,
+                                __global float2 *u, __global float2 *f, const uint size, const float SMOOTHING_LENGTH,
+                                const float NORMALIZATION_PRESSURE_FORCE, const float NORMALIZATION_VISCOUS_FORCE) {
+    int idx = get_global_id(0);
+    f[idx] = (float2) (0, 0);
+    uint blockX = (uint) (pos[idx].x) / (uint) (SMOOTHING_LENGTH);
+    uint blockY = (uint) (pos[idx].y) / (uint) (SMOOTHING_LENGTH);
+    for (uint by = blockY - 1; by != blockY + 2; ++by) {
+        for (uint bx = blockX - 1; bx != blockX + 2; ++bx) {
+            uint tgtKey = CalcBucketHashFromBucketLoc(bx, by) % size;
+            uint tgtKeyStartIdx = bucketKeyStartIdxMap[tgtKey];
+            for (uint tgtBucketIdx = tgtKeyStartIdx; tgtBucketIdx < size; ++tgtBucketIdx) {
+                if (bucket[tgtBucketIdx].y != tgtKey) {
+                    break;
+                }
+                uint tgt = bucket[tgtBucketIdx].x;
+                uint tgtBx = (uint) (pos[tgt].x) / (uint) (SMOOTHING_LENGTH);
+                uint tgtBy = (uint) (pos[tgt].y) / (uint) (SMOOTHING_LENGTH);
+                if (tgtBx != bx || tgtBy != by || tgt == idx) {
+                    continue;
+                }
+                float dist = Distance(pos[idx], pos[tgt]);
+                if (dist >= SMOOTHING_LENGTH) {
+                    continue;
+                }
+                float force = NORMALIZATION_PRESSURE_FORCE * (p[tgt] + p[idx]) / (2 * rho[tgt]) *
+                              (SMOOTHING_LENGTH - dist) * (SMOOTHING_LENGTH - dist);
+                f[idx].x += force * (pos[tgt].x - pos[idx].x) / max(dist, 0.001f);
+                f[idx].y += force * (pos[tgt].y - pos[idx].y) / max(dist, 0.001f);
+
+                float viscosity = NORMALIZATION_VISCOUS_FORCE * 1 / (2 * rho[tgt]) * (SMOOTHING_LENGTH - dist);
+                f[idx].x += viscosity * (u[tgt].x - u[idx].x);
+                f[idx].y += viscosity * (u[tgt].y - u[idx].y);
+
+                f[idx].x = f[idx].x;
+                f[idx].y = f[idx].y;
+            }
+        }
+    }
+}
+
+__kernel void UpdatePosVelocityKernel(__global const float *rho, __global float2 *f, __global float2 *pos,
+                                      __global float2 *u, const uint size, const float2 G_FORCE,
+                                      const float2 DOMAIN_X_LIM, const float2 DOMAIN_Y_LIM, const float DT,
+                                      const float DAMPING_COEFFICIENT, const float MAX_ACC) {
+    int idx = get_global_id(0);
+    pos[idx].x += u[idx].x * DT;
+    pos[idx].y += u[idx].y * DT;
+    if (pos[idx].x < DOMAIN_X_LIM.x) {
+        pos[idx].x = DOMAIN_X_LIM.x;
+        u[idx].x *= DAMPING_COEFFICIENT;
+    }
+    if (pos[idx].y < DOMAIN_Y_LIM.x) {
+        pos[idx].y = DOMAIN_Y_LIM.x;
+        u[idx].y *= DAMPING_COEFFICIENT;
+    }
+    if (pos[idx].x > DOMAIN_X_LIM.y) {
+        pos[idx].x = DOMAIN_X_LIM.y;
+        u[idx].x *= DAMPING_COEFFICIENT;
+    }
+    if (pos[idx].y > DOMAIN_Y_LIM.y) {
+        pos[idx].y = DOMAIN_Y_LIM.y;
+        u[idx].y *= DAMPING_COEFFICIENT;
+    }
+    u[idx].x += (min(MAX_ACC, max(-MAX_ACC, f[idx].x / rho[idx])) + G_FORCE.x) * DT;
+    u[idx].y += (min(MAX_ACC, max(-MAX_ACC, f[idx].y / rho[idx])) + G_FORCE.y) * DT;
+}
+
+__kernel void GetColorKernel(__global const float *rho, __global float *colorVec, const float BASE_DENSITY) {
+
+    int i = get_global_id(0);
+    float diff = 2 - min(max(rho[i], 0.0f), BASE_DENSITY * 2) / BASE_DENSITY;
+    colorVec[i * 4 + 0] = diff < 1 ? 1 : 2 - diff;
+    colorVec[i * 4 + 1] = diff < 1 ? diff : 1;
+    colorVec[i * 4 + 2] = 0;
+    colorVec[i * 4 + 3] = 1;
+}
+
+__kernel void GetXyzsKernel(__global const float2 *pos, __global float *xyzsVec, const float biasX, const float biasY,
+                            const float scaling) {
+
+    int i = get_global_id(0);
+    xyzsVec[i * 4 + 0] = (pos[i].x + biasX) / scaling;
+    xyzsVec[i * 4 + 1] = (pos[i].y + biasY) / scaling;
+    xyzsVec[i * 4 + 2] = i / 10000.0f;
+    xyzsVec[i * 4 + 3] = 1 / scaling;
 }

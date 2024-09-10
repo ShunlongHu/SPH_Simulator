@@ -291,8 +291,8 @@ void EngineHash2D::UpdateDensityKernel(uint64_t idx) {
     const auto& pos = pos_[idx];
     auto blockX = static_cast<uint32_t>(pos.x[0]) / static_cast<uint32_t>(SMOOTHING_LENGTH);
     auto blockY = static_cast<uint32_t>(pos.x[1]) / static_cast<uint32_t>(SMOOTHING_LENGTH);
-    for (uint32_t by = blockY - 1; by <= blockY + 1; ++by) {
-        for (uint32_t bx = blockX - 1; bx <= blockX + 1; ++bx) {
+    for (uint32_t by = blockY - 1; by != blockY + 2; ++by) {
+        for (uint32_t bx = blockX - 1; bx != blockX + 2; ++bx) {
             auto tgtKey = CalcBucketHash(bx, by) % pos_.size();
             auto tgtKeyStartIdx = bucketKeyStartIdxMap_[tgtKey];
             for (uint32_t tgtBucketIdx = tgtKeyStartIdx; tgtBucketIdx < bucketKeyStartIdxMap_.size(); ++tgtBucketIdx) {
