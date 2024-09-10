@@ -1,4 +1,4 @@
-if (${OPENCL_BUILD} STREQUAL CUDA)
+if (EXISTS ${OPENCL_BUILD} and ${OPENCL_BUILD} STREQUAL "CUDA")
     find_package(CUDAToolkit REQUIRED)
     set(OPENCL_LIB CUDA::OpenCL)
 else ()
