@@ -31,4 +31,4 @@
 4. Run the program in the <<**PROJECT_ROOT_DIRECTORY**>> (the one contains shader/ folder).
 5. It shall produce the following result:
 
-<img src="https://github.com/ShunlongHu/SPH_Simulator/blob/master/SPH.gif" width="200%" height="200%"/>
+<img src="https://github.com/ShunlongHu/SPH_Simulator/blob/master/SPH.gif" width="150%" height="150%"/>
