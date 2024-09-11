@@ -175,13 +175,33 @@ void EngineHashCL2D::InitOpenCl(int particleNum) {
     // Get local size
     cout << GetPlatformName(0) << endl;
     cout << GetDeviceName(0, 0) << endl;
-    ctx_ = GetContext(0, 0);
+    std::vector<cl::Platform> platforms;
+    cl::Platform::get(&platforms);
+
+    if (platforms.empty()) {
+        std::cerr << "No platforms!" << std::endl;
+        exit(-1);
+    }
+
+    platform_ = platforms[0];
+    std::vector<cl::Device> Devices;
+
+    platform_.getDevices(CL_DEVICE_TYPE_GPU, &Devices);
+    if (Devices.empty()) {
+        std::cerr << "No Devices!" << std::endl;
+        exit(-1);
+    }
+
+    device_ = Devices[0];
+    std::cout << "Device : " << device_.getInfo<CL_DEVICE_NAME>() << std::endl;
+
+    ctx_ = cl::Context({device_});
     localWorkSize_ = GetLocalWorkgroupSize(0, 0);
 
     // load prog
     prog = "#define MAX_LOCAL_SIZE " + to_string(localWorkSize_[0]) + '\n' + prog;
     cl_int ret;
-    program_ = cl::Program(prog, true, &ret);
+    program_ = cl::Program(ctx_, prog, true, &ret);
     if (ret != CL_SUCCESS) {
         cout << getErrorString(ret) << endl;
         cout << GetBuildLog(program_, 0, 0) << endl;
@@ -201,8 +221,7 @@ void EngineHashCL2D::InitOpenCl(int particleNum) {
     xyzsKernel_ = cl::Kernel(program_, "GetXyzsKernel");
 
     // load context
-    ctx_ = GetContext(0, 0);
-    q_ = cl::CommandQueue(ctx_);
+    q_ = cl::CommandQueue(ctx_, device_);
 
     // create buffer
     posBuf_ = cl::Buffer(ctx_, CL_MEM_READ_WRITE, particleNum * sizeof(float) * 2);

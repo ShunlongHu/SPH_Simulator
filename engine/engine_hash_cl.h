@@ -5,7 +5,7 @@
 #ifndef TUTORIALS_ENGINE_HASH_CL_H
 #define TUTORIALS_ENGINE_HASH_CL_H
 #define CL_HPP_TARGET_OPENCL_VERSION 300
-#include <CL/opencl.hpp>
+#include <CL/cl.hpp>
 #include <cmath>
 #include <cstdint>
 #include <unordered_map>
@@ -82,6 +82,8 @@ public:
     // OpenCL members
     uint32_t particleNum_;
     uint32_t nextPowOf2_{2};
+    cl::Platform platform_;
+    cl::Device device_;
     cl::Context ctx_;
     cl::Program program_;
     std::vector<size_t> localWorkSize_;

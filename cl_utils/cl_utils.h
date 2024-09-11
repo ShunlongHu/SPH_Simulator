@@ -1,16 +1,12 @@
 #pragma once
+#ifndef CL_UTILS_H
+#define CL_UTILS_H
 
+#include <CL/cl.hpp>
 #include <fstream>
 #include <iostream>
 #include <sstream>
 #include <vector>
-
-#define CL_USE_DEPRECATED_OPENCL_1_2_APIS
-#define CL_HPP_MINIMUM_OPENCL_VERSION 120
-#define CL_HPP_TARGET_OPENCL_VERSION 120
-#define CL_HPP_ENABLE_EXCEPTIONS
-
-#include <CL/opencl.hpp>
 
 using namespace std;
 
@@ -24,7 +20,7 @@ ostream& operator<<(ostream& out, const vector<T>& v) {
     return out;
 }
 
-vector<size_t> GetLocalWorkgroupSize(int platform_id, int device_id) {
+inline vector<size_t> GetLocalWorkgroupSize(int platform_id, int device_id) {
     vector<cl::Platform> platforms;
     cl::Platform::get(&platforms);
 
@@ -33,13 +29,13 @@ vector<size_t> GetLocalWorkgroupSize(int platform_id, int device_id) {
     return devices[device_id].getInfo<CL_DEVICE_MAX_WORK_ITEM_SIZES>();
 }
 
-string GetPlatformName(int platform_id) {
+inline string GetPlatformName(int platform_id) {
     vector<cl::Platform> platforms;
     cl::Platform::get(&platforms);
     return platforms[platform_id].getInfo<CL_PLATFORM_NAME>();
 }
 
-string GetDeviceName(int platform_id, int device_id) {
+inline string GetDeviceName(int platform_id, int device_id) {
     vector<cl::Platform> platforms;
     cl::Platform::get(&platforms);
     vector<cl::Device> devices;
@@ -47,7 +43,7 @@ string GetDeviceName(int platform_id, int device_id) {
     return devices[device_id].getInfo<CL_DEVICE_NAME>();
 }
 
-string GetBuildLog(cl::Program& program, int platform_id, int device_id) {
+inline string GetBuildLog(cl::Program& program, int platform_id, int device_id) {
     vector<cl::Platform> platforms;
     cl::Platform::get(&platforms);
     vector<cl::Device> devices;
@@ -55,7 +51,7 @@ string GetBuildLog(cl::Program& program, int platform_id, int device_id) {
     return program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(devices[device_id]);
 }
 
-const char* getErrorString(cl_int error) {
+inline const char* getErrorString(cl_int error) {
     switch (error) {
             // run-time and JIT compiler errors
         case 0:
@@ -197,21 +193,14 @@ const char* getErrorString(cl_int error) {
     }
 }
 
-void CheckError(cl_int error) {
+inline void CheckError(cl_int error) {
     if (error != CL_SUCCESS) {
         cerr << "OpenCL call failed with error " << getErrorString(error) << endl;
         exit(1);
     }
 }
 
-void AddSources(cl::Program::Sources& sources, const string& file_name) {
-    //TODO: add file existence check
-    ifstream file(file_name);
-    string* source_code = new string(istreambuf_iterator<char>(file), (istreambuf_iterator<char>()));
-    sources.push_back((*source_code).c_str());
-}
-
-string ListPlatformsDevices() {
+inline string ListPlatformsDevices() {
 
     stringstream sstream;
     vector<cl::Platform> platforms;
@@ -257,7 +246,7 @@ string ListPlatformsDevices() {
     return sstream.str();
 }
 
-cl::Context GetContext(int platform_id, int device_id) {
+inline cl::Context GetContext(int platform_id, int device_id) {
     vector<cl::Platform> platforms;
 
     cl::Platform::get(&platforms);
@@ -276,7 +265,7 @@ cl::Context GetContext(int platform_id, int device_id) {
 
 enum ProfilingResolution { PROF_NS = 1, PROF_US = 1000, PROF_MS = 1000000, PROF_S = 1000000000 };
 
-string GetFullProfilingInfo(const cl::Event& evnt, ProfilingResolution resolution) {
+inline string GetFullProfilingInfo(const cl::Event& evnt, ProfilingResolution resolution) {
     stringstream sstream;
 
     sstream << "Queued "
@@ -315,3 +304,4 @@ string GetFullProfilingInfo(const cl::Event& evnt, ProfilingResolution resolutio
 
     return sstream.str();
 }
+#endif
