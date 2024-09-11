@@ -32,3 +32,5 @@
 5. It shall produce the following result:
 
 <img src="https://github.com/ShunlongHu/SPH_Simulator/blob/master/SPH.gif" width="150%" height="150%"/>
+
+6. **IMPORTANT！！！** Press **"P"** to exit!.
