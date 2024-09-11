@@ -238,25 +238,36 @@ __kernel void UpdateForceKernel(__global const uint2 *bucket, __global const uin
 __kernel void UpdatePosVelocityKernel(__global const float *rho, __global float2 *f, __global float2 *pos,
                                       __global float2 *u, const uint size, const float2 G_FORCE,
                                       const float2 DOMAIN_X_LIM, const float2 DOMAIN_Y_LIM, const float DT,
-                                      const float DAMPING_COEFFICIENT, const float MAX_ACC) {
+                                      const float DAMPING_COEFFICIENT, const float MAX_ACC, const uint OBSTACLE_NUM,
+                                      const float OBSTACLE_V) {
     int idx = get_global_id(0);
+    float DC = DAMPING_COEFFICIENT;
+    if (idx < OBSTACLE_NUM) {
+        DC = -1;
+        if (u[idx].x == 0) {
+            u[idx].x = OBSTACLE_V;
+        }
+    }
     pos[idx].x += u[idx].x * DT;
     pos[idx].y += u[idx].y * DT;
     if (pos[idx].x < DOMAIN_X_LIM.x) {
         pos[idx].x = DOMAIN_X_LIM.x;
-        u[idx].x *= DAMPING_COEFFICIENT;
+        u[idx].x *= DC;
     }
     if (pos[idx].y < DOMAIN_Y_LIM.x) {
         pos[idx].y = DOMAIN_Y_LIM.x;
-        u[idx].y *= DAMPING_COEFFICIENT;
+        u[idx].y *= DC;
     }
     if (pos[idx].x > DOMAIN_X_LIM.y) {
         pos[idx].x = DOMAIN_X_LIM.y;
-        u[idx].x *= DAMPING_COEFFICIENT;
+        u[idx].x *= DC;
     }
     if (pos[idx].y > DOMAIN_Y_LIM.y) {
         pos[idx].y = DOMAIN_Y_LIM.y;
-        u[idx].y *= DAMPING_COEFFICIENT;
+        u[idx].y *= DC;
+    }
+    if (idx < OBSTACLE_NUM) {
+        return;
     }
     u[idx].x += (min(MAX_ACC, max(-MAX_ACC, f[idx].x / rho[idx])) + G_FORCE.x) * DT;
     u[idx].y += (min(MAX_ACC, max(-MAX_ACC, f[idx].y / rho[idx])) + G_FORCE.y) * DT;
@@ -278,6 +289,6 @@ __kernel void GetXyzsKernel(__global const float2 *pos, __global float *xyzsVec,
     int i = get_global_id(0);
     xyzsVec[i * 4 + 0] = (pos[i].x + biasX) / scaling;
     xyzsVec[i * 4 + 1] = (pos[i].y + biasY) / scaling;
-    xyzsVec[i * 4 + 2] = i / 10000.0f;
+    xyzsVec[i * 4 + 2] = 0;
     xyzsVec[i * 4 + 3] = 1 / scaling;
 }

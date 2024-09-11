@@ -32,14 +32,33 @@ inline uint32_t CalcBucketHash(uint32_t bucketX, uint32_t bucketY) {
 EngineHashCL2D::EngineHashCL2D(int particleNum) : particleNum_(particleNum) {
     for (; nextPowOf2_ < particleNum_; nextPowOf2_ *= 2) {
     }
+    nextPowOf2_ = max(2048U, nextPowOf2_);// otherwise sorting will be reversed
     srand(0);
     pos_.resize(particleNum);
     xyzsVec_.resize(particleNum * 4);
     colorVec_.resize(particleNum * 4);
 
-    for (int i = 0; i < particleNum; ++i) {
-        float y = -(static_cast<float>(rand()) / RAND_MAX) * (DOMAIN_Y_LIM[1] - DOMAIN_Y_LIM[0]) / 2 + DOMAIN_Y_LIM[1];
-        float x = -(static_cast<float>(rand()) / RAND_MAX) * (DOMAIN_X_LIM[1] - DOMAIN_X_LIM[0]) / 2 + DOMAIN_X_LIM[1];
+    for (int i = 0; i < OBSTACLE_NUM; ++i) {
+        auto diff = OBSTACLE_LEN / OBSTACLE_NUM;
+        pos_[i] = {DOMAIN_X_LIM[0],
+                   (DOMAIN_Y_LIM[1] - DOMAIN_Y_LIM[0]) / 2 + diff * i - OBSTACLE_LEN / 2 + DOMAIN_Y_LIM[0]};
+    }
+
+    auto freeParticleNum = particleNum - OBSTACLE_NUM;
+    auto area = (DOMAIN_Y_LIM[1] - DOMAIN_Y_LIM[0]) * (DOMAIN_X_LIM[1] - DOMAIN_X_LIM[0]);
+    auto particleDensity = freeParticleNum / area;
+    auto spacing = sqrt(1 / particleDensity);
+    auto xNum = static_cast<int>(ceil((DOMAIN_X_LIM[1] - DOMAIN_X_LIM[0]) / spacing));
+    auto yNum = static_cast<int>(ceil((DOMAIN_Y_LIM[1] - DOMAIN_Y_LIM[0]) / spacing));
+    auto xSpacing = (DOMAIN_X_LIM[1] - DOMAIN_X_LIM[0]) / xNum;
+    auto ySpacing = (DOMAIN_Y_LIM[1] - DOMAIN_Y_LIM[0]) / yNum;
+
+    for (int i = OBSTACLE_NUM; i < particleNum; ++i) {
+        auto col = (i - OBSTACLE_NUM) % xNum;
+        auto row = (i - OBSTACLE_NUM) / xNum;
+
+        auto x = col * xSpacing + DOMAIN_X_LIM[0];
+        auto y = row * ySpacing + DOMAIN_Y_LIM[0];
         pos_[i] = {x, y};
     }
     InitOpenCl(particleNum);
@@ -100,7 +119,6 @@ inline size_t GetGlobalWorkSize(size_t DataElemCount, size_t LocalWorkSize) {
 }
 
 void EngineHashCL2D::BitonicMergeSortCL() {
-    uint32_t nextPowOf2 = 2;
     size_t globalWorkSize[1];
 
     globalWorkSize[0] = GetGlobalWorkSize(nextPowOf2_ / 2, localWorkSize_[0]);
@@ -289,6 +307,8 @@ void EngineHashCL2D::UpdatePosVelocityCL() {
     posVelocityKernel_.setArg(8, DT);
     posVelocityKernel_.setArg(9, DAMPING_COEFFICIENT);
     posVelocityKernel_.setArg(10, MAX_ACC);
+    posVelocityKernel_.setArg(11, OBSTACLE_NUM);
+    posVelocityKernel_.setArg(12, OBSTACLE_V);
     q_.enqueueNDRangeKernel(posVelocityKernel_, {}, {particleNum_}, {});
 }
 }// namespace Sph

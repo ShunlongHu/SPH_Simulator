@@ -28,7 +28,7 @@ static unique_ptr<MeshColorPosStrip> pParticle;
 static double lastTime{0};
 static GLuint programID{0};
 static GLuint ViewProjMatrixID{0};
-static EngineHashCL2D engine2D(1500);
+static EngineHashCL2D engine2D(10000);
 
 void Render::Init() {
     // Initialize GLEW

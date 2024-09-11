@@ -57,9 +57,12 @@ public:
     constexpr static float DAMPING_COEFFICIENT = -0.3;
     constexpr static Pos<2> G_FORCE = {0, -0.1};
     constexpr static float DT = 0.01;
-    constexpr static float DOMAIN_WIDTH = 240;
+    constexpr static float DOMAIN_WIDTH = 480;
     constexpr static float DOMAIN_HEIGHT = 160;
     constexpr static float MAX_ACC = 100;
+    constexpr static uint32_t OBSTACLE_NUM = 10;
+    constexpr static float OBSTACLE_LEN = 20;
+    constexpr static float OBSTACLE_V = 5.0f;
 
     constexpr static float DOMAIN_X_LIM[2] = {
             SMOOTHING_LENGTH,
