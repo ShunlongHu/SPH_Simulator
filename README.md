@@ -30,4 +30,4 @@
     ```
 4. Run the program in the <<**PROJECT_ROOT_DIRECTORY**>> (the one contains shader/ folder).
 5. It shall produce the following result:
-![Uploading ezgif-2-b5489f9f9f.gif…]()
+![SPH_animation](https://github.com/ShunlongHu/SPH_Simulator/blob/master/SPH.gif)
