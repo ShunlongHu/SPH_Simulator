@@ -9,19 +9,20 @@
     ```c++
     #include <CL/cl.hpp>
     ```
-    into:
-    
+   into:
+
     ```c++
     #include <CL/cl2.hpp>
     ```
-3. By default, the particle color is determined by density. To produce the result in the sample, please change the <<*particles.cl*>> shader file. Change:
+3. By default, the particle color is determined by density. To produce the result in the sample, please change the <<
+   *particles.cl*>> shader file. Change:
    ```opencl
     colorVec[i * 4 + 0] = diff < 1 ? 1 : 2 - diff;
     colorVec[i * 4 + 1] = diff < 1 ? diff : 1;
     colorVec[i * 4 + 2] = 0;
     colorVec[i * 4 + 3] = 1;
    ```
-    into:
+   into:
     ```opencl
     colorVec[i * 4 + 0] = i < 4000;
     colorVec[i * 4 + 1] = 4000 <= i && i < 6000;
@@ -34,3 +35,5 @@
 <img src="https://github.com/ShunlongHu/SPH_Simulator/blob/master/SPH.gif" width="150%" height="150%"/>
 
 6. **IMPORTANT！！！** Press **"P"** to exit!.
+7. The result is rendered in a 3D world. Press WASD to move around. Press R to rise up, F to fall down. Move mouse to
+   look around.
